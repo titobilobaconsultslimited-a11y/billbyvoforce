@@ -480,8 +480,11 @@ function updatePreview() {
       <div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(date)}</div></div>
       <span class="receipt-status-badge ${statusClass}">${status.toUpperCase()}</span>
     </div>
-    <div class="receipt-watermark" style="color:${hex}40">BillbyVOForce · Professional Receipt</div>`;
-}
+    <div class="receipt-brand-footer">
+      <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
+      <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
+      <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div>
+    </div>`;
 
 function saveReceipt() {
   if (!App.currentUser) return;
@@ -553,7 +556,11 @@ function buildPrintWindow(previewInnerHTML, font, hex) {
     .receipt-date-value{font-size:14px;color:#333;font-weight:500}
     .receipt-status-badge{padding:6px 16px;border-radius:100px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
     .receipt-status-badge.paid{background:#dcfce7;color:#16a34a}.receipt-status-badge.pending{background:#fef3c7;color:#d97706}
-    .receipt-watermark{padding:12px 28px;text-align:center;font-size:10px;color:#ccc;letter-spacing:2px;text-transform:uppercase;border-top:1px solid #f5f5f5}
+    .receipt-watermark{display:none}
+    .receipt-brand-footer{padding:16px 28px;text-align:center;border-top:2px solid #f0f0f0;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .receipt-brand-logo{width:36px;height:36px;object-fit:cover;border-radius:6px}
+    .receipt-brand-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#111}
+    .receipt-brand-slogan{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#aaa}
     @media print{@page{margin:0.5cm;size:A4}}</style></head>
     <body><div class="receipt-preview">${previewInnerHTML}</div>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
@@ -633,7 +640,11 @@ function previewReceiptFromDashboard(id) {
     <div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc || '—'}</div>
     <div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30"><div class="receipt-amount-label" style="color:${hex}">Total Amount</div><div class="receipt-amount-value">${formatAmount(r.amount, r.currency)}</div></div></div>
     <div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>
-    <div class="receipt-watermark" style="color:${hex}40">BillbyVOForce · Professional Receipt</div>`;
+    <div class="receipt-brand-footer">
+      <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
+      <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
+      <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div>
+    </div>`;
   $('#modal-receipt-preview').innerHTML = html;
   $('#modal-receipt-preview').style.fontFamily = font;
   $('#modal-download-btn').onclick = () => downloadFromDashboard(id);
@@ -652,7 +663,7 @@ function downloadFromDashboard(id) {
   const sClient = escapeHTML(r.client || '');
   const sDesc = escapeHTML(r.desc || '');
   const sReceiptNum = escapeHTML(r.receiptNum || '');
-  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div><div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30"><div class="receipt-amount-label" style="color:${hex}">Total Amount</div><div class="receipt-amount-value">${formatAmount(r.amount,r.currency)}</div></div></div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div><div class="receipt-watermark" style="color:${hex}40">BillbyVOForce · Professional Receipt</div>`;
+  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div><div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30"><div class="receipt-amount-label" style="color:${hex}">Total Amount</div><div class="receipt-amount-value">${formatAmount(r.amount,r.currency)}</div></div></div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div><div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   buildPrintWindow(html, font, hex);
 }
 
