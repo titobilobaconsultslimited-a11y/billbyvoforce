@@ -121,7 +121,7 @@ function computeAmounts(amount, vatEnabled, vatRate) {
   return { subtotal, vatAmt, total };
 }
 
-function buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex) {
+function buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, amountPaid) {
   const amountBg = hex + '18';
   const { subtotal, vatAmt, total } = computeAmounts(amount, vatEnabled, vatRate);
   let html = '';
@@ -135,7 +135,24 @@ function buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex) {
     <div class="receipt-amount-label" style="color:${hex}">Total Amount</div>
     <div class="receipt-amount-value">${formatAmount(total, currency)}</div>
   </div>`;
+  const paid = parseFloat(amountPaid || 0);
+  if (paid > 0 && paid < total) {
+    const balance = total - paid;
+    html += `<div class="receipt-payment-breakdown">
+      <div class="receipt-payment-row"><span class="receipt-payment-label">Amount Paid</span><span class="receipt-payment-val receipt-val-paid">${formatAmount(paid, currency)}</span></div>
+      <div class="receipt-payment-row receipt-balance-row"><span class="receipt-payment-label">Balance Due</span><span class="receipt-payment-val receipt-val-balance">${formatAmount(balance, currency)}</span></div>
+    </div>`;
+  }
   return html;
+}
+
+function buildAccountDetailsHTML(bankName, accountNumber, accountName) {
+  if (!bankName && !accountNumber && !accountName) return '';
+  const rows = [];
+  if (bankName) rows.push(`<div class="receipt-account-row"><span class="receipt-account-key">Bank</span><span class="receipt-account-val">${escapeHTML(bankName)}</span></div>`);
+  if (accountNumber) rows.push(`<div class="receipt-account-row"><span class="receipt-account-key">Account No.</span><span class="receipt-account-val receipt-account-number">${escapeHTML(accountNumber)}</span></div>`);
+  if (accountName) rows.push(`<div class="receipt-account-row"><span class="receipt-account-key">Account Name</span><span class="receipt-account-val">${escapeHTML(accountName)}</span></div>`);
+  return `<div class="receipt-account-details"><div class="receipt-account-label">PAYMENT DETAILS</div>${rows.join('')}</div>`;
 }
 
 function escapeHTML(str) {
@@ -368,6 +385,10 @@ function initGenerator() {
     updatePreview();
   });
 
+  $$('#field-bank-name, #field-account-number, #field-account-name').forEach(el => {
+    el.addEventListener('input', updatePreview);
+  });
+
   $('#btn-save-receipt').addEventListener('click', saveReceipt);
   $('#btn-download').addEventListener('click', downloadReceipt);
   $('#btn-new-receipt').addEventListener('click', newReceipt);
@@ -478,6 +499,9 @@ function updatePreview() {
   const font = $('#field-font').value || 'DM Sans';
   const vatEnabled = $('#field-vat-toggle').checked;
   const vatRate = $('#field-vat-rate').value || '7.5';
+  const bankName = $('#field-bank-name')?.value || '';
+  const accountNumber = $('#field-account-number')?.value || '';
+  const accountName = $('#field-account-name')?.value || '';
   if (!App.currentReceipt) App.currentReceipt = { receiptNum: generateReceiptNum() };
   const receiptNum = App.currentReceipt.receiptNum;
   const hex = App.brandColor;
@@ -487,7 +511,8 @@ function updatePreview() {
   const sClient = escapeHTML(client);
   const sDesc = escapeHTML(desc);
   const sReceiptNum = escapeHTML(receiptNum);
-  const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex);
+  const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, 0);
+  const accountDetailsHtml = buildAccountDetailsHTML(bankName, accountNumber, accountName);
 
   $('#receipt-preview').style.fontFamily = font;
   $('#receipt-preview').innerHTML = `
@@ -509,6 +534,7 @@ function updatePreview() {
       <div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(date)}</div></div>
       <span class="receipt-status-badge ${statusClass}">${status.toUpperCase()}</span>
     </div>
+    ${accountDetailsHtml}
     <div class="receipt-brand-footer">
       <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
       <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
@@ -522,6 +548,10 @@ function saveReceipt() {
   const amount = $('#field-amount').value;
   if (!client) { toast('Please enter a client name', 'error'); return; }
   if (!amount || isNaN(amount)) { toast('Please enter a valid amount', 'error'); return; }
+  const receiptStatus = $('#field-status').value;
+  const receiptVatEnabled = $('#field-vat-toggle').checked;
+  const receiptVatRate = $('#field-vat-rate').value || '7.5';
+  const { total: invoiceTotal } = computeAmounts(amount, receiptVatEnabled, receiptVatRate);
   const receipt = {
     id: Date.now(),
     receiptNum: App.currentReceipt?.receiptNum || generateReceiptNum(),
@@ -529,9 +559,14 @@ function saveReceipt() {
     client, desc: $('#field-desc').value.trim(),
     clientEmail: $('#field-client-email').value.trim(),
     amount, currency: $('#field-currency').value,
-    vatEnabled: $('#field-vat-toggle').checked,
-    vatRate: $('#field-vat-rate').value || '7.5',
-    date: $('#field-date').value, status: $('#field-status').value,
+    vatEnabled: receiptVatEnabled,
+    vatRate: receiptVatRate,
+    bankName: $('#field-bank-name').value.trim(),
+    accountNumber: $('#field-account-number').value.trim(),
+    accountName: $('#field-account-name').value.trim(),
+    amountPaid: receiptStatus === 'paid' ? invoiceTotal : 0,
+    payments: receiptStatus === 'paid' ? [{ amount: invoiceTotal, date: $('#field-date').value, note: 'Full payment' }] : [],
+    date: $('#field-date').value, status: receiptStatus,
     brandColor: App.brandColor, logoBase64: App.logoBase64,
     fontStyle: $('#field-font').value, createdAt: new Date().toISOString(),
   };
@@ -556,6 +591,9 @@ function newReceipt() {
   $('#field-vat-toggle').checked = false;
   $('#field-vat-rate').value = '7.5';
   $('#vat-rate-group').style.display = 'none';
+  $('#field-bank-name').value = '';
+  $('#field-account-number').value = '';
+  $('#field-account-name').value = '';
   const area = $('#logo-upload-area');
   area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
   area.style.padding = '24px';
@@ -635,6 +673,14 @@ function buildPrintWindow(previewInnerHTML, font, hex) {
     .receipt-brand-logo{width:36px;height:36px;object-fit:cover;border-radius:6px}
     .receipt-brand-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#111}
     .receipt-brand-slogan{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#aaa}
+    .receipt-account-details{padding:14px 28px;border-top:1px solid #f0f0f0}
+    .receipt-account-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#aaa;margin-bottom:8px}
+    .receipt-account-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#444}
+    .receipt-account-key{color:#888;font-weight:500}.receipt-account-val{font-weight:500}.receipt-account-number{font-family:monospace;letter-spacing:1px}
+    .receipt-payment-breakdown{padding:8px 0;margin-bottom:8px}
+    .receipt-payment-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-top:1px dashed #f0f0f0}
+    .receipt-payment-label{font-weight:500;color:#666}.receipt-payment-val{font-family:monospace;font-weight:600}
+    .receipt-val-paid{color:#16a34a}.receipt-balance-row{border-top:2px solid #e0e0e0}.receipt-val-balance{color:#d97706;font-size:15px}
     @media print{@page{margin:0.5cm;size:A4}}</style></head>
     <body><div class="receipt-preview">${previewInnerHTML}</div>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
@@ -647,6 +693,7 @@ function initDashboard() {
   renderDashboard();
   $('#dashboard-search').addEventListener('input', renderReceiptList);
   $('#dashboard-filter').addEventListener('change', renderReceiptList);
+  $('#btn-record-payment').addEventListener('click', recordPayment);
 }
 
 function renderDashboard() { renderStats(); renderReceiptList(); }
@@ -714,6 +761,7 @@ function renderReceiptList() {
       <div class="table-cell mono">${formatAmount(r.amount, r.currency)}</div>
       <div class="table-cell"><span class="status-pill ${r.status}">${r.status.toUpperCase()}</span></div>
       <div class="table-cell"><div class="table-actions" onclick="event.stopPropagation()">
+        ${r.status === 'pending' ? `<button class="btn btn-primary btn-sm btn-icon" title="Receive Payment" onclick="receivePayment('${r.id}')">💰</button>` : ''}
         <button class="btn btn-ghost btn-sm btn-icon" title="Download" onclick="downloadFromDashboard('${r.id}')">⬇</button>
         <button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteReceipt('${r.id}')">✕</button>
       </div></div>
@@ -732,7 +780,8 @@ function previewReceiptFromDashboard(id) {
   const sClient = escapeHTML(r.client || '');
   const sDesc = escapeHTML(r.desc || '');
   const sReceiptNum = escapeHTML(r.receiptNum || '');
-  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex);
+  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex, r.amountPaid);
+  const accountDetailsHtml = buildAccountDetailsHTML(r.bankName, r.accountNumber, r.accountName);
   const html = `
     <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${sArtist}</div></div>
     <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div>
@@ -743,6 +792,7 @@ function previewReceiptFromDashboard(id) {
     <div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc || '—'}</div>
     ${amountSection}</div>
     <div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>
+    ${accountDetailsHtml}
     <div class="receipt-brand-footer">
       <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
       <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
@@ -765,8 +815,9 @@ function downloadFromDashboard(id) {
   const sClient = escapeHTML(r.client || '');
   const sDesc = escapeHTML(r.desc || '');
   const sReceiptNum = escapeHTML(r.receiptNum || '');
-  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex);
-  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div><div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
+  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex, r.amountPaid);
+  const accountDetailsHtml = buildAccountDetailsHTML(r.bankName, r.accountNumber, r.accountName);
+  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   buildPrintWindow(html, font, hex);
 }
 
@@ -776,6 +827,55 @@ function deleteReceipt(id) {
   saveUserReceipts(App.currentUser.email, receipts);
   renderDashboard();
   toast('Receipt deleted', 'info');
+}
+
+function receivePayment(id) {
+  const r = getUserReceipts(App.currentUser.email).find(rec => String(rec.id) === String(id));
+  if (!r) return;
+  App._paymentReceiptId = id;
+  const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
+  const alreadyPaid = parseFloat(r.amountPaid || 0);
+  const balance = total - alreadyPaid;
+  $('#payment-receipt-info').innerHTML = `
+    <div class="payment-summary-card">
+      <div class="payment-summary-client">${escapeHTML(r.client)} — <span style="color:var(--text3)">#${escapeHTML(r.receiptNum)}</span></div>
+      <div class="payment-summary-row"><span>Invoice Total</span><span>${formatAmount(total, r.currency)}</span></div>
+      ${alreadyPaid > 0 ? `<div class="payment-summary-row"><span>Already Received</span><span style="color:var(--green)">${formatAmount(alreadyPaid, r.currency)}</span></div>` : ''}
+      <div class="payment-summary-row payment-summary-balance"><span>Balance Due</span><span>${formatAmount(balance, r.currency)}</span></div>
+    </div>`;
+  $('#payment-amount').value = balance.toFixed(2);
+  $('#payment-date').value = new Date().toISOString().split('T')[0];
+  $('#payment-note').value = '';
+  openModal('modal-receive-payment');
+}
+
+function recordPayment() {
+  const id = App._paymentReceiptId;
+  if (!id) return;
+  const amountIn = parseFloat($('#payment-amount').value || 0);
+  const date = $('#payment-date').value;
+  const note = $('#payment-note').value.trim();
+  if (!amountIn || amountIn <= 0) { toast('Enter a valid amount received', 'error'); return; }
+  const receipts = getUserReceipts(App.currentUser.email);
+  const idx = receipts.findIndex(r => String(r.id) === String(id));
+  if (idx === -1) return;
+  const r = receipts[idx];
+  const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
+  if (!r.payments) r.payments = [];
+  r.payments.push({ amount: amountIn, date, note });
+  r.amountPaid = parseFloat((parseFloat(r.amountPaid || 0) + amountIn).toFixed(2));
+  if (r.amountPaid >= total) {
+    r.status = 'paid';
+    r.amountPaid = total;
+    toast('Receipt marked as PAID ✅', 'success');
+  } else {
+    toast(`${formatAmount(amountIn, r.currency)} recorded — ${formatAmount(total - r.amountPaid, r.currency)} still outstanding`, 'info');
+  }
+  receipts[idx] = r;
+  saveUserReceipts(App.currentUser.email, receipts);
+  App._paymentReceiptId = null;
+  closeModal('modal-receive-payment');
+  renderDashboard();
 }
 
 // ─── MODAL ────────────────────────────────────

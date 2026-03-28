@@ -261,6 +261,27 @@
             </select>
           </div>
         </div>
+
+        <!-- PAYMENT DETAILS -->
+        <div class="panel" style="margin-top:20px">
+          <div class="panel-title">
+            <div class="icon">🏦</div>PAYMENT DETAILS
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="field-bank-name">Bank Name</label>
+            <input class="form-input" type="text" id="field-bank-name" placeholder="e.g. GTBank, Zenith Bank">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="field-account-number">Account Number</label>
+              <input class="form-input" type="text" id="field-account-number" placeholder="0123456789" maxlength="20">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="field-account-name">Account Name</label>
+              <input class="form-input" type="text" id="field-account-name" placeholder="Your business account name">
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- RIGHT: PREVIEW + ACTIONS -->
@@ -357,6 +378,32 @@
     <div class="modal-body">
       <div id="modal-receipt-preview" class="receipt-preview" style="margin-bottom:20px"></div>
       <button class="btn btn-primary btn-full" id="modal-download-btn">🖨 Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: RECEIVE PAYMENT ─── -->
+<div class="modal-overlay" id="modal-receive-payment">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">RECEIVE PAYMENT</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="payment-receipt-info"></div>
+      <div class="form-group">
+        <label class="form-label" for="payment-amount">Amount Received</label>
+        <input class="form-input" type="number" id="payment-amount" placeholder="0.00" min="0" step="0.01">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="payment-date">Payment Date</label>
+        <input class="form-input" type="date" id="payment-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="payment-note">Note <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input class="form-input" type="text" id="payment-note" placeholder="e.g. Bank transfer, partial payment">
+      </div>
+      <button class="btn btn-primary btn-full" id="btn-record-payment">💰 Record Payment</button>
     </div>
   </div>
 </div>

@@ -833,6 +833,45 @@ select.form-input {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* ─── RECEIPT PAYMENT BREAKDOWN ─── */
+.receipt-payment-breakdown { padding: 8px 0; margin-bottom: 8px; }
+.receipt-payment-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-top: 1px dashed var(--border); }
+.receipt-payment-label { font-weight: 500; color: var(--text2); }
+.receipt-payment-val { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+.receipt-val-paid { color: var(--green); }
+.receipt-balance-row { border-top: 2px solid var(--border); }
+.receipt-val-balance { color: var(--yellow); font-size: 15px; }
+
+/* ─── RECEIPT ACCOUNT DETAILS ─── */
+.receipt-account-details {
+  padding: 14px 28px;
+  border-top: 1px solid #f0f0f0;
+}
+.receipt-account-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+.receipt-account-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; color: #333; }
+.receipt-account-key { color: #888; font-weight: 500; }
+.receipt-account-val { font-weight: 500; }
+.receipt-account-number { font-family: 'JetBrains Mono', monospace; letter-spacing: 1px; }
+
+/* ─── PAYMENT SUMMARY CARD (receive payment modal) ─── */
+.payment-summary-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+.payment-summary-client { font-weight: 600; margin-bottom: 10px; font-size: 14px; }
+.payment-summary-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; color: var(--text2); }
+.payment-summary-balance { border-top: 1px dashed var(--border); margin-top: 6px; padding-top: 8px; font-weight: 700; color: var(--yellow); }
+
 /* ─── ACTION BUTTONS ROW ─── */
 .action-row {
   display: flex;
