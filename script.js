@@ -2,6 +2,87 @@
    BillbyVOForce — Main Script
    ════════════════════════════════════════════ */
 
+// ─── AVOA RATE CARD SERVICES ─────────────────
+const AVOA_SERVICES = {
+  'Radio': [
+    { name: 'Standard Radio Commercial', desc: 'Standard Radio Commercial — FMCG/Family/Household/Electronic Brand', amount: 100000 },
+    { name: 'Premium Radio Commercial', desc: 'Premium Radio Commercial — Political/Telecom/Oil & Gas/Financial/Luxury Brand', amount: 150000 },
+    { name: 'Radio Promo/Teaser', desc: 'Radio Promo/Teaser — Audience awareness of upcoming events or giveaways', amount: 100000 },
+    { name: 'Radio Mnemonic/Pay-Off', desc: 'Radio Mnemonic/Pay-Off', amount: 100000 },
+    { name: 'Radio Sponsorship Ident/Bumper', desc: 'Radio Sponsorship Identifier/Bumper — Opening and Closing program components', amount: 100000 },
+    { name: 'Radio End Board/Tag', desc: 'Radio End Board/Tag — Date, time, phone, website, legal disclaimer at end of commercial', amount: 100000 },
+    { name: 'Radio Timecheck', desc: 'Radio Timecheck — Branded time alert with call to action', amount: 50000 },
+  ],
+  'TV': [
+    { name: 'Standard TV Commercial', desc: 'Standard TV Commercial — FMCG/Family/Household/Electronic Brand', amount: 150000 },
+    { name: 'Premium TV Commercial', desc: 'Premium TV Commercial — Political/Telecom/Oil & Gas/Financial/Luxury Brand', amount: 250000 },
+    { name: 'TV Promo/Teaser', desc: 'TV Promo/Teaser — Audience awareness of upcoming events or giveaways', amount: 100000 },
+    { name: 'TV Sponsorship Ident/Bumper (Program)', desc: 'TV Program Sponsorship Ident/Bumper — per set, per program', amount: 150000 },
+    { name: 'TV Sponsorship Ident/Bumper (Franchise)', desc: 'TV Franchise Ident/Bumper — per set, per season', amount: 300000 },
+    { name: 'TV End Board/Tag', desc: 'TV End Board/Tag — Date, time, phone, website, legal disclaimer at end of commercial', amount: 150000 },
+    { name: 'TV Trailer', desc: 'TV Trailer — Promotional commercial for a film or video release', amount: 150000 },
+  ],
+  'Corporate': [
+    { name: 'Corporate External Presentation', desc: 'Corporate External Presentation — Conference, concert or live event (Non-Broadcast)', amount: 500000 },
+    { name: 'Corporate Audio Guide', desc: 'Corporate Audio Guide — Museum/Exhibition/Tour audio guide (under 20 minutes)', amount: 150000 },
+    { name: 'Corporate Generic VO', desc: 'Corporate Generic VO — Company audiovisual website content, up to 5 recorded minutes', amount: 150000 },
+    { name: 'Corporate Internal Presentation', desc: 'Corporate Internal Presentation — Company retreats, AGMs, Stakeholder Meetings', amount: 150000 },
+  ],
+  'E-Learning': [
+    { name: 'E-Learning (Minimum Charge)', desc: 'E-Learning Voiceover — Minimum project charge', amount: 100000 },
+    { name: 'E-Learning Per Finished Hour', desc: 'E-Learning Per Finished Hour — includes editing, proofing, mastering', amount: 900000 },
+    { name: 'E-Learning Per Raw Hour', desc: 'E-Learning Per Raw Hour — RAW recording only, no editing', amount: 400000 },
+  ],
+  'Explainer Videos': [
+    { name: 'Explainer Video (Up to 90 seconds)', desc: 'Explainer Video — Single video up to 90 seconds, 1–2 year usage', amount: 200000 },
+    { name: 'Explainer Video (Bulk Rate, up to 175 words)', desc: 'Explainer Video — Bulk rate, up to 175 words per video, no editing', amount: 150000 },
+  ],
+  'Audiobooks': [
+    { name: 'Audiobook Per Finished Hour (PFH)', desc: 'Audiobook Per Finished Hour — clean recording delivery, no additional editing', amount: 180000 },
+    { name: 'Audiobook Per Raw Hour', desc: 'Audiobook Per Raw Hour — RAW narration only, no editing', amount: 150000 },
+    { name: 'Audiobook Production Add-On (Per Hour)', desc: 'Audiobook Production Add-On — independent editing, proofing and mastering, per hour', amount: 80000 },
+  ],
+  'Audio Drama': [
+    { name: 'Audio Drama — Non-Commercial (5–30 min)', desc: 'Audio Drama (Non-Commercial) — per artist, per character, 5–30 minute episode', amount: 50000 },
+    { name: 'Audio Drama — Non-Commercial (31–60 min)', desc: 'Audio Drama (Non-Commercial) — per artist, per character, 31–60 minute episode', amount: 80000 },
+    { name: 'Audio Drama — Commercial (5–30 min)', desc: 'Audio Drama (Commercial) — per artist, per character, 5–30 minute episode', amount: 80000 },
+    { name: 'Audio Drama — Commercial (31–60 min)', desc: 'Audio Drama (Commercial) — per artist, per character, 31–60 minute episode', amount: 100000 },
+  ],
+  'Animation': [
+    { name: 'Animated Series — Episode Rate', desc: 'Animated Series Episode Rate — per character, per episode', amount: 250000 },
+    { name: 'Animated Series — Session Rate (per hour)', desc: 'Animated Series Session Rate — first hour', amount: 200000 },
+    { name: 'Animated Series — Half Day Rate', desc: 'Animated Series Half Day Session Rate', amount: 500000 },
+    { name: 'Animated Series — Full Day Rate', desc: 'Animated Series Full Day Session Rate', amount: 800000 },
+  ],
+  'IVR': [
+    { name: 'IVR — Per Prompt (Minimum Charge)', desc: 'IVR Interactive Voice Response — per prompt, minimum charge, RAW recording', amount: 300000 },
+    { name: 'IVR — Automated Call Blast (up to 5 min)', desc: 'IVR Automated Call Blast Service — up to 5 recorded minutes, RAW recording', amount: 100000 },
+  ],
+  'Internet': [
+    { name: 'Internet Pre-Roll Commercial', desc: 'Internet Pre-Roll Commercial — YouTube/Streaming platforms, per commercial', amount: 100000 },
+    { name: 'Internet Generic Online Ad', desc: 'Internet Generic Online Ad — stand-alone commercial for internet use only', amount: 100000 },
+    { name: 'Internet Explainer/Infomercial', desc: 'Internet Explainer/Infomercial — up to 5 recorded minutes', amount: 150000 },
+    { name: 'YouTube Content (Non-Commercial)', desc: 'YouTube Content (Non-Commercial) — up to 5 recorded minutes', amount: 150000 },
+  ],
+  'Podcast': [
+    { name: 'Podcast Intro/Outro', desc: 'Podcast Intro/Outro', amount: 150000 },
+  ],
+  'Cinema': [
+    { name: 'Cinema Commercial', desc: 'Cinema Commercial — per artist, per character/accent, annually', amount: 100000 },
+  ],
+  'ADR': [
+    { name: 'Audio Description (per hour)', desc: 'Audio Description — voicing on-screen action for visually impaired audience, per hour', amount: 150000 },
+    { name: 'Reversion Dubbing (per hour)', desc: 'Reversion Dubbing — voicing in a different language, per hour', amount: 150000 },
+    { name: 'Single ADR Lip Sync — Film/Series (per hour)', desc: 'Single ADR (Lip Sync) for Film or Series — per hour', amount: 150000 },
+    { name: 'Single ADR Lip Sync — TV Commercial', desc: 'Single ADR (Lip Sync) for TV Commercial — per character, per commercial', amount: 150000 },
+  ],
+  'Games': [
+    { name: 'Video Game VO (per hour)', desc: 'Video Game Voiceover — per hour (minimum 2–4 hours)', amount: 200000 },
+    { name: 'Toy VO (per hour)', desc: 'Toy Voiceover — per hour', amount: 50000 },
+    { name: 'Mobile Game App (per session)', desc: 'Mobile Game App Voiceover — per session', amount: 600000 },
+  ],
+};
+
 // ─── STATE ───────────────────────────────────
 const App = {
   currentUser: null,
@@ -247,6 +328,7 @@ function initGenerator() {
   const today = new Date().toISOString().split('T')[0];
   $('#field-date').value = today;
   initColorPicker();
+  initServiceQuickFill();
 
   const logoArea = $('#logo-upload-area');
   logoArea.onclick = () => $('#logo-upload').click();
@@ -261,6 +343,47 @@ function initGenerator() {
   $('#btn-download').addEventListener('click', downloadReceipt);
   $('#btn-new-receipt').addEventListener('click', newReceipt);
   updatePreview();
+}
+
+function initServiceQuickFill() {
+  const catSel = $('#service-category');
+  const itemSel = $('#service-item');
+
+  catSel.addEventListener('change', () => {
+    const cat = catSel.value;
+    if (!cat) {
+      itemSel.innerHTML = '<option value="">— Select Category First —</option>';
+      itemSel.disabled = true;
+      return;
+    }
+    const services = AVOA_SERVICES[cat] || [];
+    itemSel.innerHTML =
+      '<option value="">— Select Service —</option>' +
+      services.map((s, i) => `<option value="${i}">${s.name}</option>`).join('') +
+      '<option value="custom">✏ Other / Custom</option>';
+    itemSel.disabled = false;
+  });
+
+  itemSel.addEventListener('change', () => {
+    const cat = catSel.value;
+    const val = itemSel.value;
+    if (!val) return;
+    if (val === 'custom') {
+      $('#field-desc').value = '';
+      $('#field-amount').value = '';
+      $('#field-currency').value = 'NGN';
+      $('#field-desc').focus();
+      updatePreview();
+      return;
+    }
+    const service = AVOA_SERVICES[cat]?.[parseInt(val)];
+    if (!service) return;
+    $('#field-desc').value = service.desc;
+    $('#field-amount').value = service.amount;
+    $('#field-currency').value = 'NGN';
+    updatePreview();
+    toast(`Auto-filled: ${service.name}`, 'success');
+  });
 }
 
 function initColorPicker() {
