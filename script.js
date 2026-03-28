@@ -656,6 +656,25 @@ function renderStats() {
   $('#stat-total').textContent = receipts.length;
   $('#stat-paid').textContent = receipts.filter(r => r.status === 'paid').length;
   $('#stat-pending').textContent = receipts.filter(r => r.status === 'pending').length;
+
+  const paidReceipts = receipts.filter(r => r.status === 'paid');
+  if (paidReceipts.length === 0) {
+    $('#stat-revenue').textContent = '—';
+  } else {
+    // Group by currency; if all same currency show formatted total, else show per-currency
+    const totals = {};
+    paidReceipts.forEach(r => {
+      const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
+      const cur = r.currency || 'NGN';
+      totals[cur] = (totals[cur] || 0) + total;
+    });
+    const currencies = Object.keys(totals);
+    if (currencies.length === 1) {
+      $('#stat-revenue').textContent = formatAmount(totals[currencies[0]], currencies[0]);
+    } else {
+      $('#stat-revenue').innerHTML = currencies.map(c => `<span style="display:block;font-size:14px">${formatAmount(totals[c], c)}</span>`).join('');
+    }
+  }
 }
 
 function renderReceiptList() {
