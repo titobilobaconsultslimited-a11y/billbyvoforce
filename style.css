@@ -844,7 +844,7 @@ select.form-input {
 /* ─── DASHBOARD ─── */
 .dashboard-stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 28px;
 }
@@ -1151,7 +1151,7 @@ select.form-input {
 /* ─── RESPONSIVE ─── */
 @media (max-width: 900px) {
   .generator-layout { grid-template-columns: 1fr; }
-  .dashboard-stats { grid-template-columns: 1fr 1fr; }
+  .dashboard-stats { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 640px) {

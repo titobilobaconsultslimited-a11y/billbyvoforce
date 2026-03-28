@@ -658,23 +658,32 @@ function renderStats() {
   $('#stat-pending').textContent = receipts.filter(r => r.status === 'pending').length;
 
   const paidReceipts = receipts.filter(r => r.status === 'paid');
-  if (paidReceipts.length === 0) {
-    $('#stat-revenue').textContent = '—';
-  } else {
-    // Group by currency; if all same currency show formatted total, else show per-currency
+  const pendingReceipts = receipts.filter(r => r.status === 'pending');
+
+  function sumByCurrency(list) {
     const totals = {};
-    paidReceipts.forEach(r => {
+    list.forEach(r => {
       const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
       const cur = r.currency || 'NGN';
       totals[cur] = (totals[cur] || 0) + total;
     });
+    return totals;
+  }
+
+  function renderRevenueStat(elId, list) {
+    const el = $('#' + elId);
+    if (list.length === 0) { el.textContent = '—'; return; }
+    const totals = sumByCurrency(list);
     const currencies = Object.keys(totals);
     if (currencies.length === 1) {
-      $('#stat-revenue').textContent = formatAmount(totals[currencies[0]], currencies[0]);
+      el.textContent = formatAmount(totals[currencies[0]], currencies[0]);
     } else {
-      $('#stat-revenue').innerHTML = currencies.map(c => `<span style="display:block;font-size:14px">${formatAmount(totals[c], c)}</span>`).join('');
+      el.innerHTML = currencies.map(c => `<span style="display:block;font-size:14px">${formatAmount(totals[c], c)}</span>`).join('');
     }
   }
+
+  renderRevenueStat('stat-revenue', paidReceipts);
+  renderRevenueStat('stat-outstanding', pendingReceipts);
 }
 
 function renderReceiptList() {
