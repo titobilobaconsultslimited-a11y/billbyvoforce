@@ -172,6 +172,11 @@
           </div>
 
           <div class="form-group">
+            <label class="form-label" for="field-client-email">Client Email <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">(for sending receipt)</span></label>
+            <input class="form-input" type="email" id="field-client-email" placeholder="client@company.com" autocomplete="off">
+          </div>
+
+          <div class="form-group">
             <label class="form-label" for="field-desc">Project Description</label>
             <input class="form-input" type="text" id="field-desc" placeholder="e.g. Commercial VO for Coca-Cola Radio Ad">
           </div>
@@ -189,6 +194,17 @@
                 <option value="GBP">£ British Pound (GBP)</option>
                 <option value="EUR">€ Euro (EUR)</option>
               </select>
+            </div>
+          </div>
+
+          <div class="vat-row">
+            <label class="vat-toggle-label">
+              <input type="checkbox" id="field-vat-toggle" class="vat-checkbox">
+              <span>Apply VAT</span>
+            </label>
+            <div class="vat-rate-group" id="vat-rate-group">
+              <input class="form-input" type="number" id="field-vat-rate" value="7.5" min="0" max="100" step="0.1">
+              <span class="vat-percent">%</span>
             </div>
           </div>
 
@@ -256,8 +272,7 @@
           <div id="receipt-preview" class="receipt-preview"></div>
           <div class="action-row">
             <button class="btn btn-primary" id="btn-save-receipt">💾 Save Receipt</button>
-            <button class="btn btn-secondary" id="btn-download">🖨 Download PDF</button>
-            <button class="btn btn-ghost" id="btn-new-receipt">+ New</button>
+            <button class="btn btn-secondary" id="btn-download">🖨 Download PDF</button>            <button class="btn btn-secondary" id="btn-send-email">📧 Send Email</button>            <button class="btn btn-ghost" id="btn-new-receipt">+ New</button>
           </div>
         </div>
       </div>
@@ -306,6 +321,7 @@
     <div class="receipts-table-wrap">
       <div class="table-header">
         <div class="table-col-label">Client</div>
+        <div class="table-col-label">Email</div>
         <div class="table-col-label">Date</div>
         <div class="table-col-label">Amount</div>
         <div class="table-col-label">Status</div>

@@ -776,6 +776,63 @@ select.form-input {
   color: #aaa;
 }
 
+/* ─── VAT ROW ─── */
+.vat-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.vat-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  user-select: none;
+}
+.vat-checkbox {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.vat-rate-group {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+.vat-rate-group .form-input {
+  width: 80px;
+  padding: 8px 10px;
+}
+.vat-percent {
+  font-size: 14px;
+  color: var(--text2);
+  font-weight: 600;
+}
+
+/* ─── RECEIPT VAT BREAKDOWN ─── */
+.receipt-breakdown {
+  margin-bottom: 8px;
+}
+.receipt-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 13px;
+  color: #666;
+  border-bottom: 1px dashed #f0f0f0;
+}
+.receipt-breakdown-label {
+  font-weight: 500;
+}
+.receipt-breakdown-val {
+  font-family: 'JetBrains Mono', monospace;
+}
+
 /* ─── ACTION BUTTONS ROW ─── */
 .action-row {
   display: flex;
@@ -856,7 +913,7 @@ select.form-input {
 
 .table-header {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1.8fr 1.2fr 1fr 1fr 1fr;
   gap: 0;
   padding: 14px 20px;
   background: var(--surface2);
@@ -873,7 +930,7 @@ select.form-input {
 
 .table-row {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1.8fr 1.2fr 1fr 1fr 1fr;
   gap: 0;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
@@ -1107,7 +1164,7 @@ select.form-input {
   .page-title { font-size: 32px; }
   .panel { padding: 20px; }
   .form-row { grid-template-columns: 1fr; }
-  .table-header, .table-row { grid-template-columns: 2fr 1fr 1fr; }
+  .table-header, .table-row { grid-template-columns: 2fr 1fr 1fr 1fr; }
   .table-col-label:nth-child(2), .table-cell:nth-child(2) { display: none; }
   .dashboard-stats { grid-template-columns: 1fr; }
   .action-row { flex-direction: column; }

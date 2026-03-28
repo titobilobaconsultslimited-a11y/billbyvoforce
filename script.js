@@ -114,6 +114,30 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+function computeAmounts(amount, vatEnabled, vatRate) {
+  const subtotal = parseFloat(amount || 0);
+  const vatAmt = vatEnabled ? subtotal * (parseFloat(vatRate || 0) / 100) : 0;
+  const total = subtotal + vatAmt;
+  return { subtotal, vatAmt, total };
+}
+
+function buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex) {
+  const amountBg = hex + '18';
+  const { subtotal, vatAmt, total } = computeAmounts(amount, vatEnabled, vatRate);
+  let html = '';
+  if (vatEnabled) {
+    html += `<div class="receipt-breakdown">
+      <div class="receipt-breakdown-row"><span class="receipt-breakdown-label">Subtotal</span><span class="receipt-breakdown-val">${formatAmount(subtotal, currency)}</span></div>
+      <div class="receipt-breakdown-row"><span class="receipt-breakdown-label">VAT (${vatRate}%)</span><span class="receipt-breakdown-val">${formatAmount(vatAmt, currency)}</span></div>
+    </div>`;
+  }
+  html += `<div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30">
+    <div class="receipt-amount-label" style="color:${hex}">Total Amount</div>
+    <div class="receipt-amount-value">${formatAmount(total, currency)}</div>
+  </div>`;
+  return html;
+}
+
 function escapeHTML(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -339,9 +363,15 @@ function initGenerator() {
     el.addEventListener('change', updatePreview);
   });
 
+  $('#field-vat-toggle').addEventListener('change', () => {
+    $('#vat-rate-group').style.display = $('#field-vat-toggle').checked ? 'flex' : 'none';
+    updatePreview();
+  });
+
   $('#btn-save-receipt').addEventListener('click', saveReceipt);
   $('#btn-download').addEventListener('click', downloadReceipt);
   $('#btn-new-receipt').addEventListener('click', newReceipt);
+  $('#btn-send-email').addEventListener('click', sendReceiptEmail);
   updatePreview();
 }
 
@@ -446,16 +476,18 @@ function updatePreview() {
   const date = $('#field-date').value;
   const status = $('#field-status').value || 'paid';
   const font = $('#field-font').value || 'DM Sans';
+  const vatEnabled = $('#field-vat-toggle').checked;
+  const vatRate = $('#field-vat-rate').value || '7.5';
   if (!App.currentReceipt) App.currentReceipt = { receiptNum: generateReceiptNum() };
   const receiptNum = App.currentReceipt.receiptNum;
   const hex = App.brandColor;
-  const amountBg = hex + '18';
   const logoHtml = App.logoBase64 ? `<img src="${App.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = status === 'paid' ? 'paid' : 'pending';
   const sArtist = escapeHTML(artist);
   const sClient = escapeHTML(client);
   const sDesc = escapeHTML(desc);
   const sReceiptNum = escapeHTML(receiptNum);
+  const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex);
 
   $('#receipt-preview').style.fontFamily = font;
   $('#receipt-preview').innerHTML = `
@@ -471,10 +503,7 @@ function updatePreview() {
       <div class="receipt-divider"></div>
       <div class="receipt-project-label">Project Description</div>
       <div class="receipt-project-desc">${sDesc}</div>
-      <div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30">
-        <div class="receipt-amount-label" style="color:${hex}">Total Amount</div>
-        <div class="receipt-amount-value">${formatAmount(amount, currency)}</div>
-      </div>
+      ${amountSection}
     </div>
     <div class="receipt-footer">
       <div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(date)}</div></div>
@@ -498,7 +527,10 @@ function saveReceipt() {
     receiptNum: App.currentReceipt?.receiptNum || generateReceiptNum(),
     artist: $('#field-artist').value.trim(),
     client, desc: $('#field-desc').value.trim(),
+    clientEmail: $('#field-client-email').value.trim(),
     amount, currency: $('#field-currency').value,
+    vatEnabled: $('#field-vat-toggle').checked,
+    vatRate: $('#field-vat-rate').value || '7.5',
     date: $('#field-date').value, status: $('#field-status').value,
     brandColor: App.brandColor, logoBase64: App.logoBase64,
     fontStyle: $('#field-font').value, createdAt: new Date().toISOString(),
@@ -515,11 +547,15 @@ function newReceipt() {
   App.currentReceipt = null;
   App.logoBase64 = null;
   $('#field-client').value = '';
+  $('#field-client-email').value = '';
   $('#field-desc').value = '';
   $('#field-amount').value = '';
   $('#field-currency').value = 'NGN';
   $('#field-status').value = 'paid';
   $('#field-date').value = new Date().toISOString().split('T')[0];
+  $('#field-vat-toggle').checked = false;
+  $('#field-vat-rate').value = '7.5';
+  $('#vat-rate-group').style.display = 'none';
   const area = $('#logo-upload-area');
   area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
   area.style.padding = '24px';
@@ -527,6 +563,42 @@ function newReceipt() {
   area.onclick = () => $('#logo-upload').click();
   updatePreview();
   toast('New receipt started', 'info');
+}
+
+function sendReceiptEmail() {
+  const clientEmail = $('#field-client-email').value.trim();
+  if (!clientEmail || !clientEmail.includes('@')) {
+    toast('Please enter a valid client email', 'error');
+    return;
+  }
+  const artist = $('#field-artist').value.trim() || App.currentUser?.name || '';
+  const client = $('#field-client').value.trim();
+  const desc = $('#field-desc').value.trim();
+  const amount = $('#field-amount').value || '0';
+  const currency = $('#field-currency').value;
+  const date = $('#field-date').value;
+  const status = $('#field-status').value;
+  const vatEnabled = $('#field-vat-toggle').checked;
+  const vatRate = $('#field-vat-rate').value || '7.5';
+  const receiptNum = App.currentReceipt?.receiptNum || '';
+  const { subtotal, vatAmt, total } = computeAmounts(amount, vatEnabled, vatRate);
+
+  const subject = `Receipt ${receiptNum} from ${artist}`;
+  const vatLine = vatEnabled
+    ? `Subtotal:  ${formatAmount(subtotal, currency)}\nVAT (${vatRate}%): ${formatAmount(vatAmt, currency)}\n`
+    : '';
+  const body =
+`Dear ${client},\n\nPlease find your receipt details below.\n\n` +
+`Receipt No:  ${receiptNum}\n` +
+`Date:        ${formatDate(date)}\n` +
+`From:        ${artist}\n` +
+`Project:     ${desc}\n\n` +
+`${vatLine}` +
+`Total:       ${formatAmount(total, currency)}\n` +
+`Status:      ${status.toUpperCase()}\n\n` +
+`Thank you for your business!\n\n${artist}`;
+
+  window.location.href = `mailto:${encodeURIComponent(clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
 function downloadReceipt() {
@@ -550,6 +622,7 @@ function buildPrintWindow(previewInnerHTML, font, hex) {
     .receipt-project-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#aaa;margin-bottom:8px}
     .receipt-project-desc{font-size:14px;color:#333;margin-bottom:20px}
     .receipt-amount-row{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-radius:10px;margin-bottom:16px}
+    .receipt-breakdown{margin-bottom:8px}.receipt-breakdown-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#666;border-bottom:1px dashed #f0f0f0}.receipt-breakdown-label{font-weight:500}.receipt-breakdown-val{font-family:monospace}
     .receipt-amount-label{font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
     .receipt-amount-value{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:#111}
     .receipt-footer{padding:16px 28px 24px;display:flex;justify-content:space-between;align-items:center}
@@ -608,6 +681,7 @@ function renderReceiptList() {
     return `
     <div class="table-row" onclick="previewReceiptFromDashboard('${r.id}')">
       <div class="table-cell"><div style="font-weight:600">${sClient || '—'}</div><div style="font-size:12px;color:var(--text3)">${sReceiptNum}</div></div>
+      <div class="table-cell muted" style="font-size:12px;word-break:break-all">${escapeHTML(r.clientEmail || '—')}</div>
       <div class="table-cell muted">${formatDate(r.date)}</div>
       <div class="table-cell mono">${formatAmount(r.amount, r.currency)}</div>
       <div class="table-cell"><span class="status-pill ${r.status}">${r.status.toUpperCase()}</span></div>
@@ -624,13 +698,13 @@ function previewReceiptFromDashboard(id) {
   if (!r) return;
   const hex = r.brandColor || '#e63030';
   const font = r.fontStyle || 'DM Sans';
-  const amountBg = hex + '18';
   const logoHtml = r.logoBase64 ? `<img src="${r.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = r.status === 'paid' ? 'paid' : 'pending';
   const sArtist = escapeHTML(r.artist || '');
   const sClient = escapeHTML(r.client || '');
   const sDesc = escapeHTML(r.desc || '');
   const sReceiptNum = escapeHTML(r.receiptNum || '');
+  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex);
   const html = `
     <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${sArtist}</div></div>
     <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div>
@@ -639,7 +713,7 @@ function previewReceiptFromDashboard(id) {
       <div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name" style="font-family:${font}">${sClient}</div></div>
     </div><div class="receipt-divider"></div>
     <div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc || '—'}</div>
-    <div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30"><div class="receipt-amount-label" style="color:${hex}">Total Amount</div><div class="receipt-amount-value">${formatAmount(r.amount, r.currency)}</div></div></div>
+    ${amountSection}</div>
     <div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>
     <div class="receipt-brand-footer">
       <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
@@ -657,14 +731,14 @@ function downloadFromDashboard(id) {
   if (!r) return;
   const hex = r.brandColor || '#e63030';
   const font = r.fontStyle || 'DM Sans';
-  const amountBg = hex + '18';
   const logoHtml = r.logoBase64 ? `<img src="${r.logoBase64}" style="max-width:120px;max-height:50px;object-fit:contain" alt="Logo">` : '';
   const statusClass = r.status === 'paid' ? 'paid' : 'pending';
   const sArtist = escapeHTML(r.artist || '');
   const sClient = escapeHTML(r.client || '');
   const sDesc = escapeHTML(r.desc || '');
   const sReceiptNum = escapeHTML(r.receiptNum || '');
-  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div><div class="receipt-amount-row" style="background:${amountBg};border:1px solid ${hex}30"><div class="receipt-amount-label" style="color:${hex}">Total Amount</div><div class="receipt-amount-value">${formatAmount(r.amount,r.currency)}</div></div></div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div><div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
+  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex);
+  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div><div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   buildPrintWindow(html, font, hex);
 }
 
