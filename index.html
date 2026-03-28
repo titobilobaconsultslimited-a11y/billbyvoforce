@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BillbyVOForce — Professional Receipts for Voiceover Artists</title>
+  <meta name="description" content="Create, customize, and manage professional receipts for your voiceover business.">
+  <link rel="icon" href="Media/logo.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ─── TOAST CONTAINER ─── -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- ─── NAVIGATION ─── -->
+<nav class="nav" id="main-nav" style="display:none">
+  <a class="nav-brand" href="#">
+    <img src="Media/logo.png" class="nav-logo-img" alt="VOForce Logo">
+    <div class="nav-brand-text">
+      <span class="nav-title">BILL<span>BY</span>VOFORCE</span>
+      <span class="nav-tagline">Africa's First Indigenous VoiceOver Receipt</span>
+    </div>
+  </a>
+
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+
+  <div class="nav-links" id="nav-links">
+    <button class="nav-link" data-page="generator">🎙 Generator</button>
+    <button class="nav-link" data-page="dashboard">📊 Dashboard</button>
+    <span style="font-size:12px;color:var(--text3);padding:0 8px;display:flex;align-items:center" id="nav-username"></span>
+    <button class="nav-link logout" id="btn-logout">↩ Logout</button>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle theme"><span id="theme-toggle-icon">☀️</span></button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PAGE: AUTH                                 -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-auth" class="page">
+  <div class="auth-wrap">
+    <div class="auth-bg-glow"></div>
+    <div class="auth-card">
+      <div class="auth-header">
+        <img src="Media/logo.png" class="auth-logo-img" alt="BillbyVOForce Logo">
+        <div class="auth-logo">BILL<span>BY</span>VOFORCE</div>
+        <div class="auth-tagline">Africa's First Indigenous VoiceOver Receipt</div>
+      </div>
+
+      <div class="auth-tabs" id="auth-tabs-wrap">
+        <button class="auth-tab active" data-tab="login">Login</button>
+        <button class="auth-tab" data-tab="signup">Sign Up</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="form-login">
+        <div class="form-group">
+          <label class="form-label" for="login-email">Email</label>
+          <input class="form-input" type="email" id="login-email" placeholder="you@studio.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <input class="form-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-login">Login →</button>
+        <div class="auth-toggle" style="margin-top:12px"><a id="go-forgot">Forgot Password?</a></div>
+        <div class="auth-toggle">Don't have an account? <a id="go-signup">Sign up free</a></div>
+      </div>
+
+      <!-- FORGOT PASSWORD FORM -->
+      <div id="form-forgot" style="display:none">
+        <div class="form-group">
+          <label class="form-label" for="forgot-email">Email</label>
+          <input class="form-input" type="email" id="forgot-email" placeholder="you@studio.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="forgot-password">New Password</label>
+          <input class="form-input" type="password" id="forgot-password" placeholder="Min 6 characters" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="forgot-confirm">Confirm New Password</label>
+          <input class="form-input" type="password" id="forgot-confirm" placeholder="Repeat new password" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-forgot">Reset Password →</button>
+        <div class="auth-toggle"><a id="go-back-login">← Back to Login</a></div>
+      </div>
+
+      <!-- SIGNUP FORM -->
+      <div id="form-signup" style="display:none">
+        <div class="form-group">
+          <label class="form-label" for="signup-name">Business / Artist Name</label>
+          <input class="form-input" type="text" id="signup-name" placeholder="e.g. VoicesByAde Studios" autocomplete="organization">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-email">Email</label>
+          <input class="form-input" type="email" id="signup-email" placeholder="you@studio.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-password">Password</label>
+          <input class="form-input" type="password" id="signup-password" placeholder="Min 6 characters" autocomplete="new-password">
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-signup">Create Account →</button>
+        <div class="auth-toggle">Already have an account? <a id="go-login">Login</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PAGE: GENERATOR                            -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-generator" class="page">
+  <div class="main">
+    <div class="page-header">
+      <div class="page-title">RECEIPT <span>GENERATOR</span></div>
+      <div class="page-subtitle">Fill in the details below — see your receipt update live on the right.</div>
+    </div>
+
+    <div class="generator-layout">
+      <!-- LEFT: FORM PANELS -->
+      <div>
+        <!-- RECEIPT DETAILS -->
+        <div class="panel" style="margin-bottom:20px" id="generator-form">
+          <div class="panel-title">
+            <div class="icon">🧾</div>RECEIPT DETAILS
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="field-artist">Your Business / Artist Name</label>
+            <input class="form-input" type="text" id="field-artist" placeholder="Auto-filled from your account">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="field-client">Client Name</label>
+              <input class="form-input" type="text" id="field-client" placeholder="Acme Agency">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="field-date">Date</label>
+              <input class="form-input" type="date" id="field-date">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="field-desc">Project Description</label>
+            <input class="form-input" type="text" id="field-desc" placeholder="e.g. Commercial VO for Coca-Cola Radio Ad">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="field-amount">Amount</label>
+              <input class="form-input" type="number" id="field-amount" placeholder="0.00" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="field-currency">Currency</label>
+              <select class="form-input" id="field-currency">
+                <option value="NGN">₦ Naira (NGN)</option>
+                <option value="USD">$ US Dollar (USD)</option>
+                <option value="GBP">£ British Pound (GBP)</option>
+                <option value="EUR">€ Euro (EUR)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="field-status">Receipt Status</label>
+            <select class="form-input" id="field-status">
+              <option value="paid">✅ Paid</option>
+              <option value="pending">⏳ Pending</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- BRANDING -->
+        <div class="panel">
+          <div class="panel-title">
+            <div class="icon">🎨</div>BRANDING
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Brand Color</label>
+            <div class="color-picker-wrap">
+              <div class="color-swatch">
+                <div class="color-swatch-preview" id="color-swatch-preview"></div>
+                <input type="color" id="color-picker-input" value="#e63030">
+              </div>
+              <div class="color-presets">
+                <div class="color-preset" data-color="#e63030" title="VOForce Red"></div>
+                <div class="color-preset" data-color="#2563eb" title="Studio Blue"></div>
+                <div class="color-preset" data-color="#16a34a" title="Sage Green"></div>
+                <div class="color-preset" data-color="#7c3aed" title="Royal Purple"></div>
+                <div class="color-preset" data-color="#d97706" title="Gold"></div>
+                <div class="color-preset" data-color="#111111" title="Midnight"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Upload Logo</label>
+            <div class="logo-upload-area" id="logo-upload-area">
+              <div class="logo-upload-icon">📎</div>
+              <div class="logo-upload-text">Upload Your Logo</div>
+              <div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div>
+              <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="field-font">Font Style</label>
+            <select class="form-input" id="field-font">
+              <option value="DM Sans">DM Sans (Modern)</option>
+              <option value="Playfair Display">Playfair Display (Elegant)</option>
+              <option value="JetBrains Mono">JetBrains Mono (Technical)</option>
+              <option value="Syne">Syne (Bold)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: PREVIEW + ACTIONS -->
+      <div>
+        <div class="panel" style="position:sticky;top:80px">
+          <div class="panel-title">
+            <div class="icon">👁</div>LIVE PREVIEW
+          </div>
+          <div id="receipt-preview" class="receipt-preview"></div>
+          <div class="action-row">
+            <button class="btn btn-primary" id="btn-save-receipt">💾 Save Receipt</button>
+            <button class="btn btn-secondary" id="btn-download">🖨 Download PDF</button>
+            <button class="btn btn-ghost" id="btn-new-receipt">+ New</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PAGE: DASHBOARD                            -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-dashboard" class="page">
+  <div class="main">
+    <div class="page-header">
+      <div class="page-title">MY <span>RECEIPTS</span></div>
+      <div class="page-subtitle">View, search, and manage all your saved receipts.</div>
+    </div>
+
+    <div class="dashboard-stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Receipts</div>
+        <div class="stat-value accent" id="stat-total">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Paid</div>
+        <div class="stat-value" id="stat-paid">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value" id="stat-pending">0</div>
+      </div>
+    </div>
+
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="form-input" type="text" id="dashboard-search" placeholder="Search by client, receipt number...">
+      </div>
+      <select class="form-input" id="dashboard-filter" style="max-width:160px">
+        <option value="all">All Status</option>
+        <option value="paid">Paid</option>
+        <option value="pending">Pending</option>
+      </select>
+      <button class="btn btn-primary" onclick="navigateTo('generator')">+ New Receipt</button>
+    </div>
+
+    <div class="receipts-table-wrap">
+      <div class="table-header">
+        <div class="table-col-label">Client</div>
+        <div class="table-col-label">Date</div>
+        <div class="table-col-label">Amount</div>
+        <div class="table-col-label">Status</div>
+        <div class="table-col-label" style="text-align:right">Actions</div>
+      </div>
+      <div id="receipts-list">
+        <div class="empty-state">
+          <div class="empty-icon">🧾</div>
+          <div class="empty-title">NO RECEIPTS YET</div>
+          <div class="empty-sub">Create your first receipt in the Generator.</div>
+          <button class="btn btn-primary" onclick="navigateTo('generator')">Go to Generator</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MODAL: VIEW RECEIPT ─── -->
+<div class="modal-overlay" id="modal-view-receipt">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">RECEIPT PREVIEW</div>
+      <button class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-receipt-preview" class="receipt-preview" style="margin-bottom:20px"></div>
+      <button class="btn btn-primary btn-full" id="modal-download-btn">🖨 Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
