@@ -485,6 +485,7 @@ function updatePreview() {
       <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
       <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div>
     </div>`;
+}
 
 function saveReceipt() {
   if (!App.currentUser) return;
