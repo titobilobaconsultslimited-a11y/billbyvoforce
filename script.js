@@ -970,12 +970,82 @@ async function recordPayment() {
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 
+// ─── ADMIN ────────────────────────────────────
+async function initAdmin() {
+  if (!App.currentUser?.isAdmin) { showPage('generator'); return; }
+  await renderAdminUsers();
+}
+
+async function renderAdminUsers() {
+  const { data: profiles, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+  if (error) {
+    toast('Failed to load users: ' + error.message, 'error');
+    $('#admin-users-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">ERROR LOADING USERS</div><div class="empty-sub">${escapeHTML(error.message)}</div></div>`;
+    return;
+  }
+  if (!profiles || profiles.length === 0) {
+    $('#admin-users-list').innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">NO USERS YET</div></div>';
+    return;
+  }
+
+  const { data: receipts } = await sb.from('receipts').select('user_id, amount_paid, currency');
+
+  const receiptMap = {};
+  (receipts || []).forEach(r => {
+    if (!receiptMap[r.user_id]) receiptMap[r.user_id] = { count: 0, paid: 0 };
+    receiptMap[r.user_id].count++;
+    receiptMap[r.user_id].paid += parseFloat(r.amount_paid || 0);
+  });
+
+  const totalRevenue = (receipts || []).reduce((sum, r) => sum + parseFloat(r.amount_paid || 0), 0);
+
+  $('#admin-stat-users').textContent = profiles.length;
+  $('#admin-stat-active').textContent = profiles.filter(p => !p.is_locked).length;
+  $('#admin-stat-locked').textContent = profiles.filter(p => p.is_locked).length;
+  $('#admin-stat-receipts').textContent = (receipts || []).length;
+  $('#admin-stat-revenue').textContent = formatAmount(totalRevenue, 'NGN');
+
+  const list = $('#admin-users-list');
+  list.innerHTML = profiles.map(p => {
+    const stats = receiptMap[p.id] || { count: 0, paid: 0 };
+    const locked = p.is_locked || false;
+    const joined = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+    return `
+    <div class="table-row admin-table-row">
+      <div class="table-cell"><div style="font-weight:600">${escapeHTML(p.name || '—')}</div></div>
+      <div class="table-cell muted" style="font-size:11px;word-break:break-all">${escapeHTML(p.email || '—')}</div>
+      <div class="table-cell muted" style="font-size:11px">${joined}</div>
+      <div class="table-cell mono">${stats.count}</div>
+      <div class="table-cell mono" style="font-size:11px">${formatAmount(stats.paid, 'NGN')}</div>
+      <div class="table-cell">
+        <span class="status-pill ${locked ? 'pending' : 'paid'}">${locked ? '🔒 LOCKED' : '✓ ACTIVE'}</span>
+      </div>
+      <div class="table-cell" style="text-align:right">
+        <label class="toggle-switch" title="${locked ? 'Unlock Account' : 'Lock Account'}">
+          <input type="checkbox" ${locked ? '' : 'checked'} onchange="toggleUserLock('${p.id}', ${locked})">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleUserLock(userId, currentlyLocked) {
+  const newState = !currentlyLocked;
+  const { error } = await sb.from('profiles').update({ is_locked: newState }).eq('id', userId);
+  if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+  toast(newState ? '🔒 Account locked' : '✅ Account unlocked', newState ? 'info' : 'success');
+  renderAdminUsers();
+}
+
 // ─── NAVIGATION ───────────────────────────────
 function navigateTo(page) {
   if (!App.currentUser && page !== 'auth') { showPage('auth'); return; }
+  if (page === 'admin' && !App.currentUser?.isAdmin) { showPage('generator'); return; }
   showPage(page);
   if (page === 'dashboard') renderDashboard();
   if (page === 'generator') updatePreview();
+  if (page === 'admin') initAdmin();
   $('#nav-links').classList.remove('open');
 }
 
