@@ -1,6 +1,14 @@
 /* ════════════════════════════════════════════
-   BillbyVOForce — Main Script
+   BillbyVOForce — Supabase Edition
    ════════════════════════════════════════════ */
+
+// ─── SUPABASE CONFIG ─────────────────────────
+const SUPABASE_URL = 'https://hucfpspphbbxztcduiqz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mDonpTjarnpJFYO4uYe4XA_3tHJrzd3';
+
+// Load Supabase from CDN (added to index.html <head>)
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── AVOA RATE CARD SERVICES ─────────────────
 const AVOA_SERVICES = {
@@ -85,9 +93,10 @@ const AVOA_SERVICES = {
 
 // ─── STATE ───────────────────────────────────
 const App = {
-  currentUser: null,
+  currentUser: null,   // { id, email, name }
   currentReceipt: null,
-  logoBase64: null,
+  logoBase64: null,    // preview only; actual upload goes to Supabase Storage
+  logoFile: null,      // File object for upload
   brandColor: '#e63030',
   fontStyle: 'DM Sans',
 };
@@ -157,41 +166,8 @@ function buildAccountDetailsHTML(bankName, accountNumber, accountName) {
 
 function escapeHTML(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;');
-}
-
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function getUsers() { return JSON.parse(localStorage.getItem('vof_users') || '{}'); }
-function saveUsers(u) { localStorage.setItem('vof_users', JSON.stringify(u)); }
-function getSession() { return JSON.parse(localStorage.getItem('vof_session') || 'null'); }
-function saveSession(u) { localStorage.setItem('vof_session', JSON.stringify(u)); }
-function clearSession() { localStorage.removeItem('vof_session'); }
-
-function migrateAccounts() {
-  const users = getUsers();
-  const hasLegacy = Object.values(users).some(u => u.password && u.password.length !== 64);
-  if (hasLegacy) {
-    localStorage.removeItem('vof_users');
-    clearSession();
-    toast('Old account data cleared for security. Please sign up again.', 'info');
-  }
-}
-
-function getUserReceipts(email) {
-  return JSON.parse(localStorage.getItem(`vof_receipts_${email}`) || '[]');
-}
-
-function saveUserReceipts(email, receipts) {
-  localStorage.setItem(`vof_receipts_${email}`, JSON.stringify(receipts));
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
 }
 
 // ─── TOAST ───────────────────────────────────
@@ -206,7 +182,10 @@ function toast(msg, type = 'info') {
   t.appendChild(iconSpan);
   t.appendChild(msgSpan);
   $('#toast-container').appendChild(t);
-  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(20px)'; t.style.transition = 'all 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
+  setTimeout(() => {
+    t.style.opacity = '0'; t.style.transform = 'translateX(20px)';
+    t.style.transition = 'all 0.3s'; setTimeout(() => t.remove(), 300);
+  }, 3500);
 }
 
 // ─── PAGE ROUTING ─────────────────────────────
@@ -214,7 +193,6 @@ function showPage(pageId) {
   $$('.page').forEach(p => p.classList.remove('active'));
   const page = $(`#page-${pageId}`);
   if (page) page.classList.add('active');
-
   $$('.nav-link[data-page]').forEach(l => {
     l.classList.toggle('active', l.dataset.page === pageId);
   });
@@ -231,10 +209,10 @@ function initAuth() {
       $$('.auth-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       const target = tab.dataset.tab;
-      document.getElementById('form-login').style.display = target === 'login' ? 'block' : 'none';
-      document.getElementById('form-signup').style.display = target === 'signup' ? 'block' : 'none';
-      document.getElementById('form-forgot').style.display = 'none';
-      document.getElementById('auth-tabs-wrap').style.display = 'flex';
+      $('#form-login').style.display = target === 'login' ? 'block' : 'none';
+      $('#form-signup').style.display = target === 'signup' ? 'block' : 'none';
+      $('#form-forgot').style.display = 'none';
+      $('#auth-tabs-wrap').style.display = 'flex';
     });
   });
 
@@ -243,8 +221,6 @@ function initAuth() {
   $('#btn-signup').addEventListener('click', handleSignup);
   $('#signup-password').addEventListener('keydown', e => { if (e.key === 'Enter') handleSignup(); });
   $('#btn-forgot').addEventListener('click', handleForgotPassword);
-  $('#forgot-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') handleForgotPassword(); });
-
   $('#go-signup').addEventListener('click', e => { e.preventDefault(); $('[data-tab="signup"]').click(); });
   $('#go-login').addEventListener('click', e => { e.preventDefault(); $('[data-tab="login"]').click(); });
   $('#go-forgot').addEventListener('click', e => { e.preventDefault(); showForgotForm(); });
@@ -253,55 +229,43 @@ function initAuth() {
 
 function showForgotForm() {
   clearErrors();
-  document.getElementById('form-login').style.display = 'none';
-  document.getElementById('form-signup').style.display = 'none';
-  document.getElementById('form-forgot').style.display = 'block';
-  document.getElementById('auth-tabs-wrap').style.display = 'none';
+  $('#form-login').style.display = 'none';
+  $('#form-signup').style.display = 'none';
+  $('#form-forgot').style.display = 'block';
+  $('#auth-tabs-wrap').style.display = 'none';
 }
 
 function showLoginForm() {
   clearErrors();
-  document.getElementById('form-forgot').style.display = 'none';
-  document.getElementById('form-signup').style.display = 'none';
-  document.getElementById('form-login').style.display = 'block';
-  document.getElementById('auth-tabs-wrap').style.display = 'flex';
+  $('#form-forgot').style.display = 'none';
+  $('#form-signup').style.display = 'none';
+  $('#form-login').style.display = 'block';
+  $('#auth-tabs-wrap').style.display = 'flex';
   $$('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'login'));
 }
 
-async function handleForgotPassword() {
-  const email = $('#forgot-email').value.trim().toLowerCase();
-  const password = $('#forgot-password').value;
-  const confirm = $('#forgot-confirm').value;
-  clearErrors();
-  if (!email) return showError('forgot-email', 'Email is required');
-  if (!email.includes('@')) return showError('forgot-email', 'Valid email is required');
-  if (password.length < 6) return showError('forgot-password', 'Password must be at least 6 characters');
-  if (password !== confirm) return showError('forgot-confirm', 'Passwords do not match');
-  const users = getUsers();
-  if (!users[email]) return showError('forgot-email', 'No account found with this email');
-  const hashed = await hashPassword(password);
-  users[email].password = hashed;
-  saveUsers(users);
-  toast('Password reset! You can now log in.', 'success');
-  showLoginForm();
-  $('#login-email').value = email;
-  $('#forgot-email').value = '';
-  $('#forgot-password').value = '';
-  $('#forgot-confirm').value = '';
-}
-
+// ── SUPABASE AUTH HANDLERS ──
 async function handleLogin() {
   const email = $('#login-email').value.trim().toLowerCase();
   const password = $('#login-password').value;
   clearErrors();
   if (!email) return showError('login-email', 'Email is required');
   if (!password) return showError('login-password', 'Password is required');
-  const users = getUsers();
-  if (!users[email]) return showError('login-email', 'No account found with this email');
-  const hashed = await hashPassword(password);
-  if (users[email].password !== hashed) return showError('login-password', 'Incorrect password');
-  App.currentUser = { email, name: users[email].name };
-  saveSession(App.currentUser);
+
+  const btn = $('#btn-login');
+  btn.textContent = 'Logging in…'; btn.disabled = true;
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+  btn.textContent = 'Login →'; btn.disabled = false;
+
+  if (error) {
+    if (error.message.includes('Invalid login')) return showError('login-password', 'Incorrect email or password');
+    return showError('login-email', error.message);
+  }
+
+  const profile = await fetchProfile(data.user.id);
+  App.currentUser = { id: data.user.id, email: data.user.email, name: profile?.name || email };
   enterApp();
 }
 
@@ -313,15 +277,50 @@ async function handleSignup() {
   if (!name) return showError('signup-name', 'Business name is required');
   if (!email || !email.includes('@')) return showError('signup-email', 'Valid email is required');
   if (password.length < 6) return showError('signup-password', 'Password must be at least 6 characters');
-  const users = getUsers();
-  if (users[email]) return showError('signup-email', 'An account with this email already exists');
-  const hashed = await hashPassword(password);
-  users[email] = { name, password: hashed };
-  saveUsers(users);
-  App.currentUser = { email, name };
-  saveSession(App.currentUser);
-  enterApp();
-  toast(`Welcome, ${name}! 🎙️`, 'success');
+
+  const btn = $('#btn-signup');
+  btn.textContent = 'Creating account…'; btn.disabled = true;
+
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { data: { name } }
+  });
+
+  btn.textContent = 'Create Account →'; btn.disabled = false;
+
+  if (error) return showError('signup-email', error.message);
+
+  // Insert profile manually in case trigger hasn't fired yet
+  if (data.user) {
+    await sb.from('profiles').upsert({ id: data.user.id, name, email });
+    App.currentUser = { id: data.user.id, email, name };
+    enterApp();
+    toast(`Welcome, ${name}! 🎙️`, 'success');
+  }
+}
+
+async function handleForgotPassword() {
+  const email = $('#forgot-email').value.trim().toLowerCase();
+  clearErrors();
+  if (!email || !email.includes('@')) return showError('forgot-email', 'Valid email is required');
+
+  const btn = $('#btn-forgot');
+  btn.textContent = 'Sending…'; btn.disabled = true;
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/index.html'
+  });
+
+  btn.textContent = 'Reset Password →'; btn.disabled = false;
+
+  if (error) return showError('forgot-email', error.message);
+  toast('Password reset email sent! Check your inbox.', 'success');
+  showLoginForm();
+}
+
+async function fetchProfile(userId) {
+  const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
+  return data;
 }
 
 function showError(fieldId, msg) {
@@ -331,7 +330,6 @@ function showError(fieldId, msg) {
   const err = document.createElement('div');
   err.className = 'form-error';
   err.textContent = msg;
-  err.dataset.errFor = fieldId;
   field.parentNode.appendChild(err);
 }
 
@@ -348,10 +346,11 @@ function enterApp() {
   initDashboard();
 }
 
-function handleLogout() {
+async function handleLogout() {
+  await sb.auth.signOut();
   App.currentUser = null;
   App.logoBase64 = null;
-  clearSession();
+  App.logoFile = null;
   showNav(false);
   showPage('auth');
   $('#login-email').value = '';
@@ -366,8 +365,7 @@ function updateNavUser() {
 // ─── GENERATOR ────────────────────────────────
 function initGenerator() {
   if (App.currentUser) $('#field-artist').value = App.currentUser.name;
-  const today = new Date().toISOString().split('T')[0];
-  $('#field-date').value = today;
+  $('#field-date').value = new Date().toISOString().split('T')[0];
   initColorPicker();
   initServiceQuickFill();
 
@@ -402,11 +400,7 @@ function initServiceQuickFill() {
 
   catSel.addEventListener('change', () => {
     const cat = catSel.value;
-    if (!cat) {
-      itemSel.innerHTML = '<option value="">— Select Category First —</option>';
-      itemSel.disabled = true;
-      return;
-    }
+    if (!cat) { itemSel.innerHTML = '<option value="">— Select Category First —</option>'; itemSel.disabled = true; return; }
     const services = AVOA_SERVICES[cat] || [];
     itemSel.innerHTML =
       '<option value="">— Select Service —</option>' +
@@ -420,16 +414,13 @@ function initServiceQuickFill() {
     const val = itemSel.value;
     if (!val) return;
     if (val === 'custom') {
-      $('#field-desc').value = '';
-      $('#field-amount').value = '';
-      $('#field-currency').value = 'NGN';
-      $('#field-desc').focus();
-      updatePreview();
-      return;
+      $('#field-desc').value = ''; $('#field-amount').value = '';
+      $('#field-currency').value = 'NGN'; $('#field-desc').focus();
+      updatePreview(); return;
     }
     const service = AVOA_SERVICES[cat]?.[parseInt(val)];
     if (!service) return;
-    $('#field-desc').value = service.desc;
+    $('#field-desc').value = service.description || service.desc;
     $('#field-amount').value = service.amount;
     $('#field-currency').value = 'NGN';
     updatePreview();
@@ -469,11 +460,8 @@ function initColorPicker() {
 function handleLogoUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    toast('Logo must be under 2MB', 'error');
-    e.target.value = '';
-    return;
-  }
+  if (file.size > 2 * 1024 * 1024) { toast('Logo must be under 2MB', 'error'); e.target.value = ''; return; }
+  App.logoFile = file;
   const reader = new FileReader();
   reader.onload = ev => {
     App.logoBase64 = ev.target.result;
@@ -486,6 +474,16 @@ function handleLogoUpload(e) {
     updatePreview();
   };
   reader.readAsDataURL(file);
+}
+
+async function uploadLogo(file, userId) {
+  if (!file) return null;
+  const ext = file.name.split('.').pop();
+  const path = `${userId}/${Date.now()}.${ext}`;
+  const { error } = await sb.storage.from('logos').upload(path, file, { upsert: true });
+  if (error) { console.error('Logo upload failed:', error.message); return null; }
+  const { data } = sb.storage.from('logos').getPublicUrl(path);
+  return data.publicUrl;
 }
 
 function updatePreview() {
@@ -502,32 +500,28 @@ function updatePreview() {
   const bankName = $('#field-bank-name')?.value || '';
   const accountNumber = $('#field-account-number')?.value || '';
   const accountName = $('#field-account-name')?.value || '';
+
   if (!App.currentReceipt) App.currentReceipt = { receiptNum: generateReceiptNum() };
-  const receiptNum = App.currentReceipt.receiptNum;
   const hex = App.brandColor;
   const logoHtml = App.logoBase64 ? `<img src="${App.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = status === 'paid' ? 'paid' : 'pending';
-  const sArtist = escapeHTML(artist);
-  const sClient = escapeHTML(client);
-  const sDesc = escapeHTML(desc);
-  const sReceiptNum = escapeHTML(receiptNum);
   const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, 0);
   const accountDetailsHtml = buildAccountDetailsHTML(bankName, accountNumber, accountName);
 
   $('#receipt-preview').style.fontFamily = font;
   $('#receipt-preview').innerHTML = `
     <div class="receipt-preview-header">
-      <div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${sArtist}</div></div>
-      <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div>
+      <div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(artist)}</div></div>
+      <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${escapeHTML(App.currentReceipt.receiptNum)}</div></div>
     </div>
     <div class="receipt-body">
       <div class="receipt-parties">
-        <div><div class="receipt-party-label">From</div><div class="receipt-party-name" style="font-family:${font}">${sArtist}</div></div>
-        <div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name" style="font-family:${font}">${sClient}</div></div>
+        <div><div class="receipt-party-label">From</div><div class="receipt-party-name" style="font-family:${font}">${escapeHTML(artist)}</div></div>
+        <div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name" style="font-family:${font}">${escapeHTML(client)}</div></div>
       </div>
       <div class="receipt-divider"></div>
       <div class="receipt-project-label">Project Description</div>
-      <div class="receipt-project-desc">${sDesc}</div>
+      <div class="receipt-project-desc">${escapeHTML(desc)}</div>
       ${amountSection}
     </div>
     <div class="receipt-footer">
@@ -542,38 +536,62 @@ function updatePreview() {
     </div>`;
 }
 
-function saveReceipt() {
+// ── SAVE RECEIPT TO SUPABASE ──
+async function saveReceipt() {
   if (!App.currentUser) return;
   const client = $('#field-client').value.trim();
   const amount = $('#field-amount').value;
   if (!client) { toast('Please enter a client name', 'error'); return; }
   if (!amount || isNaN(amount)) { toast('Please enter a valid amount', 'error'); return; }
+
+  const btn = $('#btn-save-receipt');
+  btn.textContent = '💾 Saving…'; btn.disabled = true;
+
+  // Upload logo if a new file was selected
+  let logoUrl = null;
+  if (App.logoFile) {
+    logoUrl = await uploadLogo(App.logoFile, App.currentUser.id);
+  }
+
   const receiptStatus = $('#field-status').value;
-  const receiptVatEnabled = $('#field-vat-toggle').checked;
-  const receiptVatRate = $('#field-vat-rate').value || '7.5';
-  const { total: invoiceTotal } = computeAmounts(amount, receiptVatEnabled, receiptVatRate);
-  const receipt = {
-    id: Date.now(),
-    receiptNum: App.currentReceipt?.receiptNum || generateReceiptNum(),
+  const vatEnabled = $('#field-vat-toggle').checked;
+  const vatRate = $('#field-vat-rate').value || '7.5';
+  const { total: invoiceTotal } = computeAmounts(amount, vatEnabled, vatRate);
+  const receiptNum = App.currentReceipt?.receiptNum || generateReceiptNum();
+
+  const payload = {
+    user_id: App.currentUser.id,
+    receipt_num: receiptNum,
     artist: $('#field-artist').value.trim(),
-    client, desc: $('#field-desc').value.trim(),
-    clientEmail: $('#field-client-email').value.trim(),
-    amount, currency: $('#field-currency').value,
-    vatEnabled: receiptVatEnabled,
-    vatRate: receiptVatRate,
-    bankName: $('#field-bank-name').value.trim(),
-    accountNumber: $('#field-account-number').value.trim(),
-    accountName: $('#field-account-name').value.trim(),
-    amountPaid: receiptStatus === 'paid' ? invoiceTotal : 0,
-    payments: receiptStatus === 'paid' ? [{ amount: invoiceTotal, date: $('#field-date').value, note: 'Full payment' }] : [],
-    date: $('#field-date').value, status: receiptStatus,
-    brandColor: App.brandColor, logoBase64: App.logoBase64,
-    fontStyle: $('#field-font').value, createdAt: new Date().toISOString(),
+    client,
+    client_email: $('#field-client-email').value.trim(),
+    description: $('#field-desc').value.trim(),
+    amount: parseFloat(amount),
+    currency: $('#field-currency').value,
+    vat_enabled: vatEnabled,
+    vat_rate: parseFloat(vatRate),
+    bank_name: $('#field-bank-name').value.trim(),
+    account_number: $('#field-account-number').value.trim(),
+    account_name: $('#field-account-name').value.trim(),
+    amount_paid: receiptStatus === 'paid' ? invoiceTotal : 0,
+    payments: receiptStatus === 'paid'
+      ? [{ amount: invoiceTotal, date: $('#field-date').value, note: 'Full payment' }]
+      : [],
+    date: $('#field-date').value,
+    status: receiptStatus,
+    brand_color: App.brandColor,
+    logo_url: logoUrl,
+    font_style: $('#field-font').value,
   };
-  const receipts = getUserReceipts(App.currentUser.email);
-  receipts.unshift(receipt);
-  saveUserReceipts(App.currentUser.email, receipts);
-  App.currentReceipt = receipt;
+
+  const { data, error } = await sb.from('receipts').insert(payload).select().single();
+
+  btn.textContent = '💾 Save Receipt'; btn.disabled = false;
+
+  if (error) { toast('Save failed: ' + error.message, 'error'); return; }
+
+  App.currentReceipt = { ...App.currentReceipt, id: data.id, receiptNum };
+  App.logoFile = null; // clear after upload
   toast('Receipt saved! 🎉', 'success');
   renderStats();
 }
@@ -581,6 +599,7 @@ function saveReceipt() {
 function newReceipt() {
   App.currentReceipt = null;
   App.logoBase64 = null;
+  App.logoFile = null;
   $('#field-client').value = '';
   $('#field-client-email').value = '';
   $('#field-desc').value = '';
@@ -597,18 +616,15 @@ function newReceipt() {
   const area = $('#logo-upload-area');
   area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
   area.style.padding = '24px';
-  $('#logo-upload').addEventListener('change', handleLogoUpload);
   area.onclick = () => $('#logo-upload').click();
+  $('#logo-upload').addEventListener('change', handleLogoUpload);
   updatePreview();
   toast('New receipt started', 'info');
 }
 
 function sendReceiptEmail() {
   const clientEmail = $('#field-client-email').value.trim();
-  if (!clientEmail || !clientEmail.includes('@')) {
-    toast('Please enter a valid client email', 'error');
-    return;
-  }
+  if (!clientEmail || !clientEmail.includes('@')) { toast('Please enter a valid client email', 'error'); return; }
   const artist = $('#field-artist').value.trim() || App.currentUser?.name || '';
   const client = $('#field-client').value.trim();
   const desc = $('#field-desc').value.trim();
@@ -620,22 +636,12 @@ function sendReceiptEmail() {
   const vatRate = $('#field-vat-rate').value || '7.5';
   const receiptNum = App.currentReceipt?.receiptNum || '';
   const { subtotal, vatAmt, total } = computeAmounts(amount, vatEnabled, vatRate);
-
   const subject = `Receipt ${receiptNum} from ${artist}`;
-  const vatLine = vatEnabled
-    ? `Subtotal:  ${formatAmount(subtotal, currency)}\nVAT (${vatRate}%): ${formatAmount(vatAmt, currency)}\n`
-    : '';
+  const vatLine = vatEnabled ? `Subtotal:  ${formatAmount(subtotal, currency)}\nVAT (${vatRate}%): ${formatAmount(vatAmt, currency)}\n` : '';
   const body =
 `Dear ${client},\n\nPlease find your receipt details below.\n\n` +
-`Receipt No:  ${receiptNum}\n` +
-`Date:        ${formatDate(date)}\n` +
-`From:        ${artist}\n` +
-`Project:     ${desc}\n\n` +
-`${vatLine}` +
-`Total:       ${formatAmount(total, currency)}\n` +
-`Status:      ${status.toUpperCase()}\n\n` +
-`Thank you for your business!\n\n${artist}`;
-
+`Receipt No:  ${receiptNum}\nDate:        ${formatDate(date)}\nFrom:        ${artist}\nProject:     ${desc}\n\n` +
+`${vatLine}Total:       ${formatAmount(total, currency)}\nStatus:      ${status.toUpperCase()}\n\nThank you for your business!\n\n${artist}`;
   window.location.href = `mailto:${encodeURIComponent(clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -659,28 +665,26 @@ function buildPrintWindow(previewInnerHTML, font, hex) {
     .receipt-party-name{font-size:15px;font-weight:600;color:#111}.receipt-divider{height:1px;background:#f0f0f0;margin:16px 0}
     .receipt-project-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#aaa;margin-bottom:8px}
     .receipt-project-desc{font-size:14px;color:#333;margin-bottom:20px}
+    .receipt-breakdown{margin-bottom:8px}.receipt-breakdown-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#666;border-bottom:1px dashed #f0f0f0}
     .receipt-amount-row{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-radius:10px;margin-bottom:16px}
-    .receipt-breakdown{margin-bottom:8px}.receipt-breakdown-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:#666;border-bottom:1px dashed #f0f0f0}.receipt-breakdown-label{font-weight:500}.receipt-breakdown-val{font-family:monospace}
     .receipt-amount-label{font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
     .receipt-amount-value{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:#111}
+    .receipt-payment-breakdown{padding:8px 0;margin-bottom:8px}
+    .receipt-payment-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-top:1px dashed #f0f0f0}
+    .receipt-payment-label{font-weight:500;color:#666}.receipt-val-paid{color:#16a34a}.receipt-val-balance{color:#d97706;font-size:15px}
     .receipt-footer{padding:16px 28px 24px;display:flex;justify-content:space-between;align-items:center}
     .receipt-date-label{font-size:11px;color:#aaa;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
     .receipt-date-value{font-size:14px;color:#333;font-weight:500}
     .receipt-status-badge{padding:6px 16px;border-radius:100px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
     .receipt-status-badge.paid{background:#dcfce7;color:#16a34a}.receipt-status-badge.pending{background:#fef3c7;color:#d97706}
-    .receipt-watermark{display:none}
+    .receipt-account-details{padding:14px 28px;border-top:1px solid #f0f0f0}
+    .receipt-account-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#aaa;margin-bottom:8px}
+    .receipt-account-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#444}
+    .receipt-account-key{color:#888;font-weight:500}.receipt-account-number{font-family:monospace;letter-spacing:1px}
     .receipt-brand-footer{padding:16px 28px;text-align:center;border-top:2px solid #f0f0f0;display:flex;flex-direction:column;align-items:center;gap:4px}
     .receipt-brand-logo{width:36px;height:36px;object-fit:cover;border-radius:6px}
     .receipt-brand-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#111}
     .receipt-brand-slogan{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#aaa}
-    .receipt-account-details{padding:14px 28px;border-top:1px solid #f0f0f0}
-    .receipt-account-label{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#aaa;margin-bottom:8px}
-    .receipt-account-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;color:#444}
-    .receipt-account-key{color:#888;font-weight:500}.receipt-account-val{font-weight:500}.receipt-account-number{font-family:monospace;letter-spacing:1px}
-    .receipt-payment-breakdown{padding:8px 0;margin-bottom:8px}
-    .receipt-payment-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-top:1px dashed #f0f0f0}
-    .receipt-payment-label{font-weight:500;color:#666}.receipt-payment-val{font-family:monospace;font-weight:600}
-    .receipt-val-paid{color:#16a34a}.receipt-balance-row{border-top:2px solid #e0e0e0}.receipt-val-balance{color:#d97706;font-size:15px}
     @media print{@page{margin:0.5cm;size:A4}}</style></head>
     <body><div class="receipt-preview">${previewInnerHTML}</div>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
@@ -696,21 +700,25 @@ function initDashboard() {
   $('#btn-record-payment').addEventListener('click', recordPayment);
 }
 
-function renderDashboard() { renderStats(); renderReceiptList(); }
+async function renderDashboard() {
+  await renderStats();
+  await renderReceiptList();
+}
 
-function renderStats() {
-  const receipts = getUserReceipts(App.currentUser.email);
+async function renderStats() {
+  const { data: receipts } = await sb.from('receipts')
+    .select('status, amount, currency, vat_enabled, vat_rate')
+    .eq('user_id', App.currentUser.id);
+
+  if (!receipts) return;
   $('#stat-total').textContent = receipts.length;
   $('#stat-paid').textContent = receipts.filter(r => r.status === 'paid').length;
   $('#stat-pending').textContent = receipts.filter(r => r.status === 'pending').length;
 
-  const paidReceipts = receipts.filter(r => r.status === 'paid');
-  const pendingReceipts = receipts.filter(r => r.status === 'pending');
-
   function sumByCurrency(list) {
     const totals = {};
     list.forEach(r => {
-      const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
+      const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
       const cur = r.currency || 'NGN';
       totals[cur] = (totals[cur] || 0) + total;
     });
@@ -729,34 +737,41 @@ function renderStats() {
     }
   }
 
-  renderRevenueStat('stat-revenue', paidReceipts);
-  renderRevenueStat('stat-outstanding', pendingReceipts);
+  renderRevenueStat('stat-revenue', receipts.filter(r => r.status === 'paid'));
+  renderRevenueStat('stat-outstanding', receipts.filter(r => r.status === 'pending'));
 }
 
-function renderReceiptList() {
-  const receipts = getUserReceipts(App.currentUser.email);
+async function renderReceiptList() {
   const search = ($('#dashboard-search').value || '').toLowerCase();
   const filter = $('#dashboard-filter').value || 'all';
 
-  const filtered = receipts.filter(r => {
-    const matchSearch = !search || [r.client, r.receiptNum, r.desc].join(' ').toLowerCase().includes(search);
-    const matchFilter = filter === 'all' || r.status === filter;
-    return matchSearch && matchFilter;
-  });
+  let query = sb.from('receipts')
+    .select('*')
+    .eq('user_id', App.currentUser.id)
+    .order('created_at', { ascending: false });
+
+  if (filter !== 'all') query = query.eq('status', filter);
+
+  const { data: receipts, error } = await query;
+
+  if (error) { toast('Error loading receipts', 'error'); return; }
+
+  const filtered = search
+    ? receipts.filter(r => [r.client, r.receipt_num, r.description].join(' ').toLowerCase().includes(search))
+    : receipts;
 
   const list = $('#receipts-list');
-  if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-title">NO RECEIPTS YET</div><div class="empty-sub">${receipts.length === 0 ? 'Create your first receipt in the Generator.' : 'No receipts match your search.'}</div>${receipts.length === 0 ? `<button class="btn btn-primary" onclick="navigateTo('generator')">Go to Generator</button>` : ''}</div>`;
+  if (!filtered || filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><div class="empty-title">NO RECEIPTS YET</div>
+      <div class="empty-sub">${!receipts?.length ? 'Create your first receipt in the Generator.' : 'No receipts match your search.'}</div>
+      ${!receipts?.length ? `<button class="btn btn-primary" onclick="navigateTo('generator')">Go to Generator</button>` : ''}</div>`;
     return;
   }
 
-  list.innerHTML = filtered.map(r => {
-    const sClient = escapeHTML(r.client || '');
-    const sReceiptNum = escapeHTML(r.receiptNum || '');
-    return `
+  list.innerHTML = filtered.map(r => `
     <div class="table-row" onclick="previewReceiptFromDashboard('${r.id}')">
-      <div class="table-cell"><div style="font-weight:600">${sClient || '—'}</div><div style="font-size:12px;color:var(--text3)">${sReceiptNum}</div></div>
-      <div class="table-cell muted" style="font-size:12px;word-break:break-all">${escapeHTML(r.clientEmail || '—')}</div>
+      <div class="table-cell"><div style="font-weight:600">${escapeHTML(r.client || '—')}</div><div style="font-size:12px;color:var(--text3)">${escapeHTML(r.receipt_num || '')}</div></div>
+      <div class="table-cell muted" style="font-size:12px;word-break:break-all">${escapeHTML(r.client_email || '—')}</div>
       <div class="table-cell muted">${formatDate(r.date)}</div>
       <div class="table-cell mono">${formatAmount(r.amount, r.currency)}</div>
       <div class="table-cell"><span class="status-pill ${r.status}">${r.status.toUpperCase()}</span></div>
@@ -765,80 +780,70 @@ function renderReceiptList() {
         <button class="btn btn-ghost btn-sm btn-icon" title="Download" onclick="downloadFromDashboard('${r.id}')">⬇</button>
         <button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteReceipt('${r.id}')">✕</button>
       </div></div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
-function previewReceiptFromDashboard(id) {
-  const r = getUserReceipts(App.currentUser.email).find(rec => String(rec.id) === String(id));
+async function previewReceiptFromDashboard(id) {
+  const { data: r } = await sb.from('receipts').select('*').eq('id', id).single();
   if (!r) return;
-  const hex = r.brandColor || '#e63030';
-  const font = r.fontStyle || 'DM Sans';
-  const logoHtml = r.logoBase64 ? `<img src="${r.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
+  const hex = r.brand_color || '#e63030';
+  const font = r.font_style || 'DM Sans';
+  const logoHtml = r.logo_url ? `<img src="${r.logo_url}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = r.status === 'paid' ? 'paid' : 'pending';
-  const sArtist = escapeHTML(r.artist || '');
-  const sClient = escapeHTML(r.client || '');
-  const sDesc = escapeHTML(r.desc || '');
-  const sReceiptNum = escapeHTML(r.receiptNum || '');
-  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex, r.amountPaid);
-  const accountDetailsHtml = buildAccountDetailsHTML(r.bankName, r.accountNumber, r.accountName);
+  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vat_enabled, r.vat_rate, hex, r.amount_paid);
+  const accountDetailsHtml = buildAccountDetailsHTML(r.bank_name, r.account_number, r.account_name);
   const html = `
-    <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${sArtist}</div></div>
-    <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div>
+    <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(r.artist||'')}</div></div>
+    <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div>
     <div class="receipt-body"><div class="receipt-parties">
-      <div><div class="receipt-party-label">From</div><div class="receipt-party-name" style="font-family:${font}">${sArtist}</div></div>
-      <div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name" style="font-family:${font}">${sClient}</div></div>
+      <div><div class="receipt-party-label">From</div><div class="receipt-party-name" style="font-family:${font}">${escapeHTML(r.artist||'')}</div></div>
+      <div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name" style="font-family:${font}">${escapeHTML(r.client||'')}</div></div>
     </div><div class="receipt-divider"></div>
-    <div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc || '—'}</div>
+    <div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${escapeHTML(r.description||'—')}</div>
     ${amountSection}</div>
-    <div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>
+    <div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div>
+    <span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>
     ${accountDetailsHtml}
-    <div class="receipt-brand-footer">
-      <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
-      <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
-      <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div>
-    </div>`;
+    <div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
+    <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
+    <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   $('#modal-receipt-preview').innerHTML = html;
   $('#modal-receipt-preview').style.fontFamily = font;
   $('#modal-download-btn').onclick = () => downloadFromDashboard(id);
   openModal('modal-view-receipt');
 }
 
-function downloadFromDashboard(id) {
-  const r = getUserReceipts(App.currentUser.email).find(rec => String(rec.id) === String(id));
+async function downloadFromDashboard(id) {
+  const { data: r } = await sb.from('receipts').select('*').eq('id', id).single();
   if (!r) return;
-  const hex = r.brandColor || '#e63030';
-  const font = r.fontStyle || 'DM Sans';
-  const logoHtml = r.logoBase64 ? `<img src="${r.logoBase64}" style="max-width:120px;max-height:50px;object-fit:contain" alt="Logo">` : '';
+  const hex = r.brand_color || '#e63030';
+  const font = r.font_style || 'DM Sans';
+  const logoHtml = r.logo_url ? `<img src="${r.logo_url}" style="max-width:120px;max-height:50px;object-fit:contain" alt="Logo">` : '';
   const statusClass = r.status === 'paid' ? 'paid' : 'pending';
-  const sArtist = escapeHTML(r.artist || '');
-  const sClient = escapeHTML(r.client || '');
-  const sDesc = escapeHTML(r.desc || '');
-  const sReceiptNum = escapeHTML(r.receiptNum || '');
-  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vatEnabled, r.vatRate, hex, r.amountPaid);
-  const accountDetailsHtml = buildAccountDetailsHTML(r.bankName, r.accountNumber, r.accountName);
-  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${sArtist}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${sReceiptNum}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${sArtist}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${sClient}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${sDesc||'—'}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
+  const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vat_enabled, r.vat_rate, hex, r.amount_paid);
+  const accountDetailsHtml = buildAccountDetailsHTML(r.bank_name, r.account_number, r.account_name);
+  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${escapeHTML(r.artist||'')}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${escapeHTML(r.artist||'')}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${escapeHTML(r.client||'')}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${escapeHTML(r.description||'—')}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   buildPrintWindow(html, font, hex);
 }
 
-function deleteReceipt(id) {
+async function deleteReceipt(id) {
   if (!confirm('Delete this receipt? This cannot be undone.')) return;
-  const receipts = getUserReceipts(App.currentUser.email).filter(r => String(r.id) !== String(id));
-  saveUserReceipts(App.currentUser.email, receipts);
+  const { error } = await sb.from('receipts').delete().eq('id', id);
+  if (error) { toast('Delete failed: ' + error.message, 'error'); return; }
   renderDashboard();
   toast('Receipt deleted', 'info');
 }
 
-function receivePayment(id) {
-  const r = getUserReceipts(App.currentUser.email).find(rec => String(rec.id) === String(id));
+async function receivePayment(id) {
+  const { data: r } = await sb.from('receipts').select('*').eq('id', id).single();
   if (!r) return;
   App._paymentReceiptId = id;
-  const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
-  const alreadyPaid = parseFloat(r.amountPaid || 0);
+  const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
+  const alreadyPaid = parseFloat(r.amount_paid || 0);
   const balance = total - alreadyPaid;
   $('#payment-receipt-info').innerHTML = `
     <div class="payment-summary-card">
-      <div class="payment-summary-client">${escapeHTML(r.client)} — <span style="color:var(--text3)">#${escapeHTML(r.receiptNum)}</span></div>
+      <div class="payment-summary-client">${escapeHTML(r.client)} — <span style="color:var(--text3)">#${escapeHTML(r.receipt_num)}</span></div>
       <div class="payment-summary-row"><span>Invoice Total</span><span>${formatAmount(total, r.currency)}</span></div>
       ${alreadyPaid > 0 ? `<div class="payment-summary-row"><span>Already Received</span><span style="color:var(--green)">${formatAmount(alreadyPaid, r.currency)}</span></div>` : ''}
       <div class="payment-summary-row payment-summary-balance"><span>Balance Due</span><span>${formatAmount(balance, r.currency)}</span></div>
@@ -849,30 +854,36 @@ function receivePayment(id) {
   openModal('modal-receive-payment');
 }
 
-function recordPayment() {
+async function recordPayment() {
   const id = App._paymentReceiptId;
   if (!id) return;
   const amountIn = parseFloat($('#payment-amount').value || 0);
   const date = $('#payment-date').value;
   const note = $('#payment-note').value.trim();
   if (!amountIn || amountIn <= 0) { toast('Enter a valid amount received', 'error'); return; }
-  const receipts = getUserReceipts(App.currentUser.email);
-  const idx = receipts.findIndex(r => String(r.id) === String(id));
-  if (idx === -1) return;
-  const r = receipts[idx];
-  const { total } = computeAmounts(r.amount, r.vatEnabled, r.vatRate);
-  if (!r.payments) r.payments = [];
-  r.payments.push({ amount: amountIn, date, note });
-  r.amountPaid = parseFloat((parseFloat(r.amountPaid || 0) + amountIn).toFixed(2));
-  if (r.amountPaid >= total) {
-    r.status = 'paid';
-    r.amountPaid = total;
+
+  const { data: r } = await sb.from('receipts').select('*').eq('id', id).single();
+  if (!r) return;
+
+  const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
+  const payments = Array.isArray(r.payments) ? r.payments : [];
+  payments.push({ amount: amountIn, date, note });
+  const newAmountPaid = parseFloat((parseFloat(r.amount_paid || 0) + amountIn).toFixed(2));
+  const newStatus = newAmountPaid >= total ? 'paid' : 'pending';
+  const finalPaid = newStatus === 'paid' ? total : newAmountPaid;
+
+  const { error } = await sb.from('receipts').update({
+    payments, amount_paid: finalPaid, status: newStatus
+  }).eq('id', id);
+
+  if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+
+  if (newStatus === 'paid') {
     toast('Receipt marked as PAID ✅', 'success');
   } else {
-    toast(`${formatAmount(amountIn, r.currency)} recorded — ${formatAmount(total - r.amountPaid, r.currency)} still outstanding`, 'info');
+    toast(`${formatAmount(amountIn, r.currency)} recorded — ${formatAmount(total - finalPaid, r.currency)} still outstanding`, 'info');
   }
-  receipts[idx] = r;
-  saveUserReceipts(App.currentUser.email, receipts);
+
   App._paymentReceiptId = null;
   closeModal('modal-receive-payment');
   renderDashboard();
@@ -900,7 +911,7 @@ function toggleTheme() {
 }
 
 // ─── INIT ─────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   const savedTheme = localStorage.getItem('vof_theme');
   if (savedTheme === 'light') {
     document.documentElement.setAttribute('data-theme', 'light');
@@ -909,12 +920,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initAuth();
 
-  // Clear any legacy btoa-hashed accounts (incompatible with SHA-256)
-  migrateAccounts();
-
-  const session = getSession();
+  // Check for existing Supabase session
+  const { data: { session } } = await sb.auth.getSession();
   if (session) {
-    App.currentUser = session;
+    const profile = await fetchProfile(session.user.id);
+    App.currentUser = {
+      id: session.user.id,
+      email: session.user.email,
+      name: profile?.name || session.user.email
+    };
     showNav(true);
     updateNavUser();
     showPage('generator');
@@ -924,6 +938,24 @@ document.addEventListener('DOMContentLoaded', () => {
     showNav(false);
     showPage('auth');
   }
+
+  // Listen for auth state changes (e.g. password reset redirect)
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session && !App.currentUser) {
+      const profile = await fetchProfile(session.user.id);
+      App.currentUser = {
+        id: session.user.id,
+        email: session.user.email,
+        name: profile?.name || session.user.email
+      };
+      enterApp();
+    }
+    if (event === 'SIGNED_OUT') {
+      App.currentUser = null;
+      showNav(false);
+      showPage('auth');
+    }
+  });
 
   $$('.nav-link[data-page]').forEach(link => {
     link.addEventListener('click', () => navigateTo(link.dataset.page));
