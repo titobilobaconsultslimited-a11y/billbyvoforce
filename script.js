@@ -737,7 +737,7 @@ async function renderDashboard() {
 
 async function renderStats() {
   const { data: receipts } = await sb.from('receipts')
-    .select('status, amount, currency, vat_enabled, vat_rate')
+    .select('status, amount, currency, vat_enabled, vat_rate, amount_paid')
     .eq('user_id', App.currentUser.id);
 
   if (!receipts) return;
@@ -745,21 +745,20 @@ async function renderStats() {
   $('#stat-paid').textContent = receipts.filter(r => r.status === 'paid').length;
   $('#stat-pending').textContent = receipts.filter(r => r.status === 'pending').length;
 
-  function sumByCurrency(list) {
+  function sumByCurrencyField(list, fieldFn) {
     const totals = {};
     list.forEach(r => {
-      const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
+      const val = fieldFn(r);
       const cur = r.currency || 'NGN';
-      totals[cur] = (totals[cur] || 0) + total;
+      totals[cur] = (totals[cur] || 0) + val;
     });
     return totals;
   }
 
-  function renderRevenueStat(elId, list) {
+  function renderCurrencyStat(elId, totals) {
     const el = $('#' + elId);
-    if (list.length === 0) { el.textContent = '—'; return; }
-    const totals = sumByCurrency(list);
     const currencies = Object.keys(totals);
+    if (currencies.length === 0) { el.textContent = '—'; return; }
     if (currencies.length === 1) {
       el.textContent = formatAmount(totals[currencies[0]], currencies[0]);
     } else {
@@ -767,8 +766,27 @@ async function renderStats() {
     }
   }
 
-  renderRevenueStat('stat-revenue', receipts.filter(r => r.status === 'paid'));
-  renderRevenueStat('stat-outstanding', receipts.filter(r => r.status === 'pending'));
+  // Total Revenue = actual money received (amount_paid) across ALL receipts
+  const revenueTotals = sumByCurrencyField(receipts, r => parseFloat(r.amount_paid || 0));
+  const hasRevenue = Object.values(revenueTotals).some(v => v > 0);
+  if (hasRevenue) {
+    renderCurrencyStat('stat-revenue', revenueTotals);
+  } else {
+    $('#stat-revenue').textContent = '—';
+  }
+
+  // Outstanding = remaining balance on pending receipts
+  const pendingReceipts = receipts.filter(r => r.status === 'pending');
+  const outstandingTotals = sumByCurrencyField(pendingReceipts, r => {
+    const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
+    return total - parseFloat(r.amount_paid || 0);
+  });
+  const hasOutstanding = Object.values(outstandingTotals).some(v => v > 0);
+  if (hasOutstanding) {
+    renderCurrencyStat('stat-outstanding', outstandingTotals);
+  } else {
+    $('#stat-outstanding').textContent = '—';
+  }
 }
 
 async function renderReceiptList() {
@@ -798,19 +816,27 @@ async function renderReceiptList() {
     return;
   }
 
-  list.innerHTML = filtered.map(r => `
+  list.innerHTML = filtered.map(r => {
+    const amountPaid = parseFloat(r.amount_paid || 0);
+    const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
+    const receivedCell = amountPaid > 0
+      ? `<span class="mono" style="color:var(--green)">${formatAmount(amountPaid, r.currency)}</span>`
+      : `<span style="color:var(--text3)">—</span>`;
+    return `
     <div class="table-row" onclick="previewReceiptFromDashboard('${r.id}')">
       <div class="table-cell"><div style="font-weight:600">${escapeHTML(r.client || '—')}</div><div style="font-size:12px;color:var(--text3)">${escapeHTML(r.receipt_num || '')}</div></div>
       <div class="table-cell muted" style="font-size:12px;word-break:break-all">${escapeHTML(r.client_email || '—')}</div>
       <div class="table-cell muted">${formatDate(r.date)}</div>
-      <div class="table-cell mono">${formatAmount(r.amount, r.currency)}</div>
+      <div class="table-cell mono">${formatAmount(total, r.currency)}</div>
+      <div class="table-cell">${receivedCell}</div>
       <div class="table-cell"><span class="status-pill ${r.status}">${r.status.toUpperCase()}</span></div>
       <div class="table-cell"><div class="table-actions" onclick="event.stopPropagation()">
         ${r.status === 'pending' ? `<button class="btn btn-primary btn-sm btn-icon" title="Receive Payment" onclick="receivePayment('${r.id}')">💰</button>` : ''}
         <button class="btn btn-ghost btn-sm btn-icon" title="Download" onclick="downloadFromDashboard('${r.id}')">⬇</button>
         <button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteReceipt('${r.id}')">✕</button>
       </div></div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function previewReceiptFromDashboard(id) {
