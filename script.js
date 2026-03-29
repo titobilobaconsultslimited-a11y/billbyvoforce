@@ -95,8 +95,9 @@ const AVOA_SERVICES = {
 const App = {
   currentUser: null,   // { id, email, name }
   currentReceipt: null,
-  logoBase64: null,    // preview only; actual upload goes to Supabase Storage
+  logoBase64: null,    // base64 preview for newly selected file
   logoFile: null,      // File object for upload
+  logoUrl: null,       // persisted URL from Supabase Storage (loaded from profile)
   brandColor: '#e63030',
   fontStyle: 'DM Sans',
 };
@@ -351,6 +352,7 @@ async function handleLogout() {
   App.currentUser = null;
   App.logoBase64 = null;
   App.logoFile = null;
+  App.logoUrl = null;
   showNav(false);
   showPage('auth');
   $('#login-email').value = '';
@@ -368,6 +370,7 @@ function initGenerator() {
   $('#field-date').value = new Date().toISOString().split('T')[0];
   initColorPicker();
   initServiceQuickFill();
+  loadProfileLogo();
 
   const logoArea = $('#logo-upload-area');
   logoArea.onclick = () => $('#logo-upload').click();
@@ -476,14 +479,33 @@ function handleLogoUpload(e) {
   reader.readAsDataURL(file);
 }
 
+async function loadProfileLogo() {
+  if (!App.currentUser) return;
+  const { data: profile } = await sb.from('profiles').select('logo_url').eq('id', App.currentUser.id).single();
+  if (profile?.logo_url) {
+    App.logoUrl = profile.logo_url;
+    const area = $('#logo-upload-area');
+    area.innerHTML = `<img src="${App.logoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
+      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
+      <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '16px';
+    $('#logo-upload').addEventListener('change', handleLogoUpload);
+    updatePreview();
+  }
+}
+
 async function uploadLogo(file, userId) {
   if (!file) return null;
   const ext = file.name.split('.').pop();
-  const path = `${userId}/${Date.now()}.${ext}`;
+  const path = `${userId}/logo.${ext}`;
   const { error } = await sb.storage.from('logos').upload(path, file, { upsert: true });
   if (error) { console.error('Logo upload failed:', error.message); return null; }
   const { data } = sb.storage.from('logos').getPublicUrl(path);
-  return data.publicUrl;
+  const url = data.publicUrl;
+  // Save to profile so it persists across sessions
+  await sb.from('profiles').update({ logo_url: url }).eq('id', userId);
+  App.logoUrl = url;
+  return url;
 }
 
 function updatePreview() {
@@ -503,7 +525,7 @@ function updatePreview() {
 
   if (!App.currentReceipt) App.currentReceipt = { receiptNum: generateReceiptNum() };
   const hex = App.brandColor;
-  const logoHtml = App.logoBase64 ? `<img src="${App.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
+  const logoHtml = (App.logoBase64 || App.logoUrl) ? `<img src="${App.logoBase64 || App.logoUrl}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = status === 'paid' ? 'paid' : 'pending';
   const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, 0);
   const accountDetailsHtml = buildAccountDetailsHTML(bankName, accountNumber, accountName);
@@ -547,8 +569,8 @@ async function saveReceipt() {
   const btn = $('#btn-save-receipt');
   btn.textContent = '💾 Saving…'; btn.disabled = true;
 
-  // Upload logo if a new file was selected
-  let logoUrl = null;
+  // Upload logo if a new file was selected, otherwise reuse persisted URL
+  let logoUrl = App.logoUrl || null;
   if (App.logoFile) {
     logoUrl = await uploadLogo(App.logoFile, App.currentUser.id);
   }
@@ -600,6 +622,7 @@ function newReceipt() {
   App.currentReceipt = null;
   App.logoBase64 = null;
   App.logoFile = null;
+  // Keep App.logoUrl so the logo persists across receipts
   $('#field-client').value = '';
   $('#field-client-email').value = '';
   $('#field-desc').value = '';
@@ -614,8 +637,15 @@ function newReceipt() {
   $('#field-account-number').value = '';
   $('#field-account-name').value = '';
   const area = $('#logo-upload-area');
-  area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
-  area.style.padding = '24px';
+  if (App.logoUrl) {
+    area.innerHTML = `<img src="${App.logoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
+      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
+      <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '16px';
+  } else {
+    area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '24px';
+  }
   area.onclick = () => $('#logo-upload').click();
   $('#logo-upload').addEventListener('change', handleLogoUpload);
   updatePreview();
