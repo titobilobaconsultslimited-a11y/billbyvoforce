@@ -650,6 +650,66 @@ select.form-input {
   line-height: 1.5;
 }
 
+/* ── Line Items Form ─────────────────────── */
+.line-items-header {
+  display: grid;
+  grid-template-columns: 1fr 60px 110px 88px 28px;
+  gap: 6px;
+  padding: 0 0 6px 0;
+  margin-bottom: 2px;
+}
+.li-header-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.line-item-row {
+  display: grid;
+  grid-template-columns: 1fr 60px 110px 88px 28px;
+  gap: 6px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.line-item-row .form-input {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.li-qty { text-align: center; }
+.li-rate { text-align: right; }
+.li-subtotal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text1);
+  text-align: right;
+  padding: 0 2px;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.li-remove-btn {
+  background: none;
+  border: 1px solid #3a3a3a;
+  color: var(--text3);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.li-remove-btn:hover {
+  background: #e63030;
+  color: #fff;
+  border-color: #e63030;
+}
+
+
 .receipt-meta {
   text-align: right;
 }
