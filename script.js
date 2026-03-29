@@ -1162,13 +1162,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     App.currentUser = {
       id: session.user.id,
       email: session.user.email,
-      name: profile?.name || session.user.email
+      name: profile?.name || session.user.email,
+      isLocked: profile?.is_locked || false,
+      isAdmin: profile?.is_admin || false,
     };
-    showNav(true);
-    updateNavUser();
-    showPage('generator');
-    initGenerator();
-    initDashboard();
+    enterApp();
   } else {
     showNav(false);
     showPage('auth');
