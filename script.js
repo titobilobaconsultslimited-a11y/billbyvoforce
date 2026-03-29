@@ -95,11 +95,11 @@ const AVOA_SERVICES = {
 const App = {
   currentUser: null,   // { id, email, name }
   currentReceipt: null,
-  logoBase64: null,    // base64 preview for newly selected file
+  logoBase64: null,    // preview only; actual upload goes to Supabase Storage
   logoFile: null,      // File object for upload
-  logoUrl: null,       // persisted URL from Supabase Storage (loaded from profile)
   brandColor: '#e63030',
   fontStyle: 'DM Sans',
+  savedLogoUrl: null,  // permanent logo from profile
 };
 
 // ─── HELPERS ─────────────────────────────────
@@ -266,13 +266,7 @@ async function handleLogin() {
   }
 
   const profile = await fetchProfile(data.user.id);
-  App.currentUser = {
-    id: data.user.id,
-    email: data.user.email,
-    name: profile?.name || email,
-    isLocked: profile?.is_locked || false,
-    isAdmin: profile?.is_admin || false,
-  };
+  App.currentUser = { id: data.user.id, email: data.user.email, name: profile?.name || email };
   enterApp();
 }
 
@@ -300,7 +294,7 @@ async function handleSignup() {
   // Insert profile manually in case trigger hasn't fired yet
   if (data.user) {
     await sb.from('profiles').upsert({ id: data.user.id, name, email });
-    App.currentUser = { id: data.user.id, email, name, isLocked: false, isAdmin: false };
+    App.currentUser = { id: data.user.id, email, name };
     enterApp();
     toast(`Welcome, ${name}! 🎙️`, 'success');
   }
@@ -315,7 +309,7 @@ async function handleForgotPassword() {
   btn.textContent = 'Sending…'; btn.disabled = true;
 
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin
+    redirectTo: window.location.origin + '/index.html'
   });
 
   btn.textContent = 'Reset Password →'; btn.disabled = false;
@@ -325,26 +319,12 @@ async function handleForgotPassword() {
   showLoginForm();
 }
 
-async function handleSetNewPassword() {
-  const pwd = $('#new-password-input').value;
-  const errEl = $('#err-new-password');
-  errEl.textContent = '';
-  if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
-
-  const btn = $('#btn-set-new-password');
-  btn.textContent = 'Updating…'; btn.disabled = true;
-
-  const { error } = await sb.auth.updateUser({ password: pwd });
-  btn.textContent = 'Update Password →'; btn.disabled = false;
-
-  if (error) { errEl.textContent = error.message; return; }
-  closeModal('modal-new-password');
-  toast('✅ Password updated successfully! Please log in.', 'success');
-  await sb.auth.signOut();
-}
-
 async function fetchProfile(userId) {
   const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
+  if (data?.logo_url) {
+    App.savedLogoUrl = data.logo_url;
+    App.logoBase64 = data.logo_url;
+  }
   return data;
 }
 
@@ -366,8 +346,6 @@ function clearErrors() {
 function enterApp() {
   showNav(true);
   updateNavUser();
-  const adminLink = $('#nav-admin-link');
-  if (adminLink) adminLink.style.display = App.currentUser?.isAdmin ? 'flex' : 'none';
   showPage('generator');
   initGenerator();
   initDashboard();
@@ -378,7 +356,6 @@ async function handleLogout() {
   App.currentUser = null;
   App.logoBase64 = null;
   App.logoFile = null;
-  App.logoUrl = null;
   showNav(false);
   showPage('auth');
   $('#login-email').value = '';
@@ -392,21 +369,19 @@ function updateNavUser() {
 
 // ─── GENERATOR ────────────────────────────────
 function initGenerator() {
-  if (App.currentUser?.isLocked) {
-    $('#account-locked-banner').style.display = 'flex';
-    $('#generator-form').style.display = 'none';
-    // Hide branding/payment panels too
-    $$('#page-generator .panel').forEach(p => p.style.display = 'none');
-    return;
-  }
-  $('#account-locked-banner').style.display = 'none';
-  $$('#page-generator .panel').forEach(p => p.style.display = '');
-
   if (App.currentUser) $('#field-artist').value = App.currentUser.name;
   $('#field-date').value = new Date().toISOString().split('T')[0];
   initColorPicker();
   initServiceQuickFill();
-  loadProfileLogo();
+
+  // Restore saved logo from profile
+  if (App.savedLogoUrl) {
+    const area = $('#logo-upload-area');
+    area.innerHTML = `<img src="${App.savedLogoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
+      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
+      <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '16px';
+  }
 
   const logoArea = $('#logo-upload-area');
   logoArea.onclick = () => $('#logo-upload').click();
@@ -502,7 +477,7 @@ function handleLogoUpload(e) {
   if (file.size > 2 * 1024 * 1024) { toast('Logo must be under 2MB', 'error'); e.target.value = ''; return; }
   App.logoFile = file;
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async ev => {
     App.logoBase64 = ev.target.result;
     const area = $('#logo-upload-area');
     area.innerHTML = `<img src="${App.logoBase64}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
@@ -511,37 +486,28 @@ function handleLogoUpload(e) {
     area.style.padding = '16px';
     $('#logo-upload').addEventListener('change', handleLogoUpload);
     updatePreview();
+
+    // Upload to Supabase Storage and save to profile permanently
+    if (App.currentUser) {
+      const logoUrl = await uploadLogo(file, App.currentUser.id);
+      if (logoUrl) {
+        App.savedLogoUrl = logoUrl;
+        await sb.from('profiles').update({ logo_url: logoUrl }).eq('id', App.currentUser.id);
+        toast('Logo saved to your profile! 🎨', 'success');
+      }
+    }
   };
   reader.readAsDataURL(file);
-}
-
-async function loadProfileLogo() {
-  if (!App.currentUser) return;
-  const { data: profile } = await sb.from('profiles').select('logo_url').eq('id', App.currentUser.id).single();
-  if (profile?.logo_url) {
-    App.logoUrl = profile.logo_url;
-    const area = $('#logo-upload-area');
-    area.innerHTML = `<img src="${App.logoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
-      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
-      <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
-    area.style.padding = '16px';
-    $('#logo-upload').addEventListener('change', handleLogoUpload);
-    updatePreview();
-  }
 }
 
 async function uploadLogo(file, userId) {
   if (!file) return null;
   const ext = file.name.split('.').pop();
-  const path = `${userId}/logo.${ext}`;
+  const path = `${userId}/${Date.now()}.${ext}`;
   const { error } = await sb.storage.from('logos').upload(path, file, { upsert: true });
   if (error) { console.error('Logo upload failed:', error.message); return null; }
   const { data } = sb.storage.from('logos').getPublicUrl(path);
-  const url = data.publicUrl;
-  // Save to profile so it persists across sessions
-  await sb.from('profiles').update({ logo_url: url }).eq('id', userId);
-  App.logoUrl = url;
-  return url;
+  return data.publicUrl;
 }
 
 function updatePreview() {
@@ -561,7 +527,7 @@ function updatePreview() {
 
   if (!App.currentReceipt) App.currentReceipt = { receiptNum: generateReceiptNum() };
   const hex = App.brandColor;
-  const logoHtml = (App.logoBase64 || App.logoUrl) ? `<img src="${App.logoBase64 || App.logoUrl}" class="receipt-logo-img" alt="Logo">` : '';
+  const logoHtml = App.logoBase64 ? `<img src="${App.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = status === 'paid' ? 'paid' : 'pending';
   const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, 0);
   const accountDetailsHtml = buildAccountDetailsHTML(bankName, accountNumber, accountName);
@@ -597,7 +563,6 @@ function updatePreview() {
 // ── SAVE RECEIPT TO SUPABASE ──
 async function saveReceipt() {
   if (!App.currentUser) return;
-  if (App.currentUser.isLocked) { toast('🔒 Account locked. Subscribe to unlock.', 'error'); return; }
   const client = $('#field-client').value.trim();
   const amount = $('#field-amount').value;
   if (!client) { toast('Please enter a client name', 'error'); return; }
@@ -606,10 +571,11 @@ async function saveReceipt() {
   const btn = $('#btn-save-receipt');
   btn.textContent = '💾 Saving…'; btn.disabled = true;
 
-  // Upload logo if a new file was selected, otherwise reuse persisted URL
-  let logoUrl = App.logoUrl || null;
+  // Upload logo if a new file was selected, otherwise use saved profile logo
+  let logoUrl = App.savedLogoUrl || null;
   if (App.logoFile) {
-    logoUrl = await uploadLogo(App.logoFile, App.currentUser.id);
+    const uploaded = await uploadLogo(App.logoFile, App.currentUser.id);
+    if (uploaded) logoUrl = uploaded;
   }
 
   const receiptStatus = $('#field-status').value;
@@ -659,7 +625,6 @@ function newReceipt() {
   App.currentReceipt = null;
   App.logoBase64 = null;
   App.logoFile = null;
-  // Keep App.logoUrl so the logo persists across receipts
   $('#field-client').value = '';
   $('#field-client-email').value = '';
   $('#field-desc').value = '';
@@ -674,15 +639,8 @@ function newReceipt() {
   $('#field-account-number').value = '';
   $('#field-account-name').value = '';
   const area = $('#logo-upload-area');
-  if (App.logoUrl) {
-    area.innerHTML = `<img src="${App.logoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
-      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
-      <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
-    area.style.padding = '16px';
-  } else {
-    area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
-    area.style.padding = '24px';
-  }
+  area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+  area.style.padding = '24px';
   area.onclick = () => $('#logo-upload').click();
   $('#logo-upload').addEventListener('change', handleLogoUpload);
   updatePreview();
@@ -690,7 +648,6 @@ function newReceipt() {
 }
 
 function sendReceiptEmail() {
-  if (App.currentUser?.isLocked) { toast('🔒 Account locked. Subscribe to unlock.', 'error'); return; }
   const clientEmail = $('#field-client-email').value.trim();
   if (!clientEmail || !clientEmail.includes('@')) { toast('Please enter a valid client email', 'error'); return; }
   const artist = $('#field-artist').value.trim() || App.currentUser?.name || '';
@@ -714,7 +671,6 @@ function sendReceiptEmail() {
 }
 
 function downloadReceipt() {
-  if (App.currentUser?.isLocked) { toast('🔒 Account locked. Subscribe to unlock.', 'error'); return; }
   buildPrintWindow($('#receipt-preview').innerHTML, $('#field-font').value || 'DM Sans', App.brandColor);
 }
 
@@ -776,7 +732,7 @@ async function renderDashboard() {
 
 async function renderStats() {
   const { data: receipts } = await sb.from('receipts')
-    .select('status, amount, currency, vat_enabled, vat_rate, amount_paid')
+    .select('status, amount, currency, vat_enabled, vat_rate')
     .eq('user_id', App.currentUser.id);
 
   if (!receipts) return;
@@ -784,20 +740,21 @@ async function renderStats() {
   $('#stat-paid').textContent = receipts.filter(r => r.status === 'paid').length;
   $('#stat-pending').textContent = receipts.filter(r => r.status === 'pending').length;
 
-  function sumByCurrencyField(list, fieldFn) {
+  function sumByCurrency(list) {
     const totals = {};
     list.forEach(r => {
-      const val = fieldFn(r);
+      const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
       const cur = r.currency || 'NGN';
-      totals[cur] = (totals[cur] || 0) + val;
+      totals[cur] = (totals[cur] || 0) + total;
     });
     return totals;
   }
 
-  function renderCurrencyStat(elId, totals) {
+  function renderRevenueStat(elId, list) {
     const el = $('#' + elId);
+    if (list.length === 0) { el.textContent = '—'; return; }
+    const totals = sumByCurrency(list);
     const currencies = Object.keys(totals);
-    if (currencies.length === 0) { el.textContent = '—'; return; }
     if (currencies.length === 1) {
       el.textContent = formatAmount(totals[currencies[0]], currencies[0]);
     } else {
@@ -805,27 +762,8 @@ async function renderStats() {
     }
   }
 
-  // Total Revenue = actual money received (amount_paid) across ALL receipts
-  const revenueTotals = sumByCurrencyField(receipts, r => parseFloat(r.amount_paid || 0));
-  const hasRevenue = Object.values(revenueTotals).some(v => v > 0);
-  if (hasRevenue) {
-    renderCurrencyStat('stat-revenue', revenueTotals);
-  } else {
-    $('#stat-revenue').textContent = '—';
-  }
-
-  // Outstanding = remaining balance on pending receipts
-  const pendingReceipts = receipts.filter(r => r.status === 'pending');
-  const outstandingTotals = sumByCurrencyField(pendingReceipts, r => {
-    const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
-    return total - parseFloat(r.amount_paid || 0);
-  });
-  const hasOutstanding = Object.values(outstandingTotals).some(v => v > 0);
-  if (hasOutstanding) {
-    renderCurrencyStat('stat-outstanding', outstandingTotals);
-  } else {
-    $('#stat-outstanding').textContent = '—';
-  }
+  renderRevenueStat('stat-revenue', receipts.filter(r => r.status === 'paid'));
+  renderRevenueStat('stat-outstanding', receipts.filter(r => r.status === 'pending'));
 }
 
 async function renderReceiptList() {
@@ -855,27 +793,19 @@ async function renderReceiptList() {
     return;
   }
 
-  list.innerHTML = filtered.map(r => {
-    const amountPaid = parseFloat(r.amount_paid || 0);
-    const { total } = computeAmounts(r.amount, r.vat_enabled, r.vat_rate);
-    const receivedCell = amountPaid > 0
-      ? `<span class="mono" style="color:var(--green)">${formatAmount(amountPaid, r.currency)}</span>`
-      : `<span style="color:var(--text3)">—</span>`;
-    return `
+  list.innerHTML = filtered.map(r => `
     <div class="table-row" onclick="previewReceiptFromDashboard('${r.id}')">
       <div class="table-cell"><div style="font-weight:600">${escapeHTML(r.client || '—')}</div><div style="font-size:12px;color:var(--text3)">${escapeHTML(r.receipt_num || '')}</div></div>
       <div class="table-cell muted" style="font-size:12px;word-break:break-all">${escapeHTML(r.client_email || '—')}</div>
       <div class="table-cell muted">${formatDate(r.date)}</div>
-      <div class="table-cell mono">${formatAmount(total, r.currency)}</div>
-      <div class="table-cell">${receivedCell}</div>
+      <div class="table-cell mono">${formatAmount(r.amount, r.currency)}</div>
       <div class="table-cell"><span class="status-pill ${r.status}">${r.status.toUpperCase()}</span></div>
       <div class="table-cell"><div class="table-actions" onclick="event.stopPropagation()">
         ${r.status === 'pending' ? `<button class="btn btn-primary btn-sm btn-icon" title="Receive Payment" onclick="receivePayment('${r.id}')">💰</button>` : ''}
         <button class="btn btn-ghost btn-sm btn-icon" title="Download" onclick="downloadFromDashboard('${r.id}')">⬇</button>
         <button class="btn btn-danger btn-sm btn-icon" title="Delete" onclick="deleteReceipt('${r.id}')">✕</button>
       </div></div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
 async function previewReceiptFromDashboard(id) {
@@ -988,82 +918,12 @@ async function recordPayment() {
 function openModal(id) { document.getElementById(id)?.classList.add('open'); }
 function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
 
-// ─── ADMIN ────────────────────────────────────
-async function initAdmin() {
-  if (!App.currentUser?.isAdmin) { showPage('generator'); return; }
-  await renderAdminUsers();
-}
-
-async function renderAdminUsers() {
-  const { data: profiles, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
-  if (error) {
-    toast('Failed to load users: ' + error.message, 'error');
-    $('#admin-users-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">ERROR LOADING USERS</div><div class="empty-sub">${escapeHTML(error.message)}</div></div>`;
-    return;
-  }
-  if (!profiles || profiles.length === 0) {
-    $('#admin-users-list').innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">NO USERS YET</div></div>';
-    return;
-  }
-
-  const { data: receipts } = await sb.from('receipts').select('user_id, amount_paid, currency');
-
-  const receiptMap = {};
-  (receipts || []).forEach(r => {
-    if (!receiptMap[r.user_id]) receiptMap[r.user_id] = { count: 0, paid: 0 };
-    receiptMap[r.user_id].count++;
-    receiptMap[r.user_id].paid += parseFloat(r.amount_paid || 0);
-  });
-
-  const totalRevenue = (receipts || []).reduce((sum, r) => sum + parseFloat(r.amount_paid || 0), 0);
-
-  $('#admin-stat-users').textContent = profiles.length;
-  $('#admin-stat-active').textContent = profiles.filter(p => !p.is_locked).length;
-  $('#admin-stat-locked').textContent = profiles.filter(p => p.is_locked).length;
-  $('#admin-stat-receipts').textContent = (receipts || []).length;
-  $('#admin-stat-revenue').textContent = formatAmount(totalRevenue, 'NGN');
-
-  const list = $('#admin-users-list');
-  list.innerHTML = profiles.map(p => {
-    const stats = receiptMap[p.id] || { count: 0, paid: 0 };
-    const locked = p.is_locked || false;
-    const joined = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
-    return `
-    <div class="table-row admin-table-row">
-      <div class="table-cell"><div style="font-weight:600">${escapeHTML(p.name || '—')}</div></div>
-      <div class="table-cell muted" style="font-size:11px;word-break:break-all">${escapeHTML(p.email || '—')}</div>
-      <div class="table-cell muted" style="font-size:11px">${joined}</div>
-      <div class="table-cell mono">${stats.count}</div>
-      <div class="table-cell mono" style="font-size:11px">${formatAmount(stats.paid, 'NGN')}</div>
-      <div class="table-cell">
-        <span class="status-pill ${locked ? 'pending' : 'paid'}">${locked ? '🔒 LOCKED' : '✓ ACTIVE'}</span>
-      </div>
-      <div class="table-cell" style="text-align:right">
-        <label class="toggle-switch" title="${locked ? 'Unlock Account' : 'Lock Account'}">
-          <input type="checkbox" ${locked ? '' : 'checked'} onchange="toggleUserLock('${p.id}', ${locked})">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function toggleUserLock(userId, currentlyLocked) {
-  const newState = !currentlyLocked;
-  const { error } = await sb.from('profiles').update({ is_locked: newState }).eq('id', userId);
-  if (error) { toast('Update failed: ' + error.message, 'error'); return; }
-  toast(newState ? '🔒 Account locked' : '✅ Account unlocked', newState ? 'info' : 'success');
-  renderAdminUsers();
-}
-
 // ─── NAVIGATION ───────────────────────────────
 function navigateTo(page) {
   if (!App.currentUser && page !== 'auth') { showPage('auth'); return; }
-  if (page === 'admin' && !App.currentUser?.isAdmin) { showPage('generator'); return; }
   showPage(page);
   if (page === 'dashboard') renderDashboard();
   if (page === 'generator') updatePreview();
-  if (page === 'admin') initAdmin();
   $('#nav-links').classList.remove('open');
 }
 
@@ -1092,14 +952,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     App.currentUser = {
       id: session.user.id,
       email: session.user.email,
-      name: profile?.name || session.user.email,
-      isLocked: profile?.is_locked || false,
-      isAdmin: profile?.is_admin || false,
+      name: profile?.name || session.user.email
     };
     showNav(true);
     updateNavUser();
-    const adminLink = $('#nav-admin-link');
-    if (adminLink) adminLink.style.display = App.currentUser.isAdmin ? 'flex' : 'none';
     showPage('generator');
     initGenerator();
     initDashboard();
@@ -1110,18 +966,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for auth state changes (e.g. password reset redirect)
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'PASSWORD_RECOVERY') {
-      openModal('modal-new-password');
-      return;
-    }
     if (event === 'SIGNED_IN' && session && !App.currentUser) {
       const profile = await fetchProfile(session.user.id);
       App.currentUser = {
         id: session.user.id,
         email: session.user.email,
-        name: profile?.name || session.user.email,
-        isLocked: profile?.is_locked || false,
-        isAdmin: profile?.is_admin || false,
+        name: profile?.name || session.user.email
       };
       enterApp();
     }
@@ -1131,8 +981,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       showPage('auth');
     }
   });
-
-  $('#btn-set-new-password').addEventListener('click', handleSetNewPassword);
 
   $$('.nav-link[data-page]').forEach(link => {
     link.addEventListener('click', () => navigateTo(link.dataset.page));
