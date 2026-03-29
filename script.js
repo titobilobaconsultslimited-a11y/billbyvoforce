@@ -684,20 +684,6 @@ function newReceipt() {
   $('#field-vat-toggle').checked = false;
   $('#field-vat-rate').value = '7.5';
   $('#vat-rate-group').style.display = 'none';
-function newReceipt() {
-  App.currentReceipt = null;
-  App.logoBase64 = App.savedLogoUrl || null; // keep saved logo
-  App.logoFile = null;
-  $('#field-client').value = '';
-  $('#field-client-email').value = '';
-  $('#field-desc').value = '';
-  $('#field-amount').value = '';
-  $('#field-currency').value = 'NGN';
-  $('#field-status').value = 'paid';
-  $('#field-date').value = new Date().toISOString().split('T')[0];
-  $('#field-vat-toggle').checked = false;
-  $('#field-vat-rate').value = '7.5';
-  $('#vat-rate-group').style.display = 'none';
   // Restore bank details + font from profile
   $('#field-bank-name').value = App.profileData?.bankName || '';
   $('#field-account-number').value = App.profileData?.accountNumber || '';
