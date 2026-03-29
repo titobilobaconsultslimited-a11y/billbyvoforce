@@ -158,6 +158,14 @@ function buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, amou
   return html;
 }
 
+function buildFromContactHTML(email, phone, address) {
+  const lines = [];
+  if (email) lines.push(`<div class="receipt-contact-line">${escapeHTML(email)}</div>`);
+  if (phone) lines.push(`<div class="receipt-contact-line">${escapeHTML(phone)}</div>`);
+  if (address) lines.push(`<div class="receipt-contact-line">${escapeHTML(address)}</div>`);
+  return lines.length ? `<div class="receipt-contact-details">${lines.join('')}</div>` : '';
+}
+
 function buildAccountDetailsHTML(bankName, accountNumber, accountName) {
   if (!bankName && !accountNumber && !accountName) return '';
   const rows = [];
@@ -574,18 +582,27 @@ function updatePreview() {
   const accountNumber = $('#field-account-number')?.value || '';
   const accountName = $('#field-account-name')?.value || '';
 
+  // Contact info from profile
+  const email = App.currentUser?.email || '';
+  const phone = App.profileData?.phone || '';
+  const address = App.profileData?.address || '';
+
   if (!App.currentReceipt) App.currentReceipt = { receiptNum: generateReceiptNum() };
   const hex = App.brandColor;
   const logoHtml = App.logoBase64 ? `<img src="${App.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = status === 'paid' ? 'paid' : 'pending';
+  // INVOICE when pending/unpaid, RECEIPT when paid or has payment
+  const amountPaid = parseFloat($('#field-amount').value || 0);
+  const docType = status === 'paid' ? 'RECEIPT' : 'INVOICE';
   const amountSection = buildAmountSectionHTML(amount, currency, vatEnabled, vatRate, hex, 0);
   const accountDetailsHtml = buildAccountDetailsHTML(bankName, accountNumber, accountName);
+  const contactHtml = buildFromContactHTML(email, phone, address);
 
   $('#receipt-preview').style.fontFamily = font;
   $('#receipt-preview').innerHTML = `
     <div class="receipt-preview-header">
-      <div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(artist)}</div></div>
-      <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${escapeHTML(App.currentReceipt.receiptNum)}</div></div>
+      <div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(artist)}</div>${contactHtml}</div>
+      <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">${docType}</div><div class="receipt-number">#${escapeHTML(App.currentReceipt.receiptNum)}</div></div>
     </div>
     <div class="receipt-body">
       <div class="receipt-parties">
@@ -656,6 +673,9 @@ async function saveReceipt() {
     brand_color: App.brandColor,
     logo_url: logoUrl,
     font_style: $('#field-font').value,
+    artist_email: App.currentUser.email || '',
+    artist_phone: App.profileData?.phone || '',
+    artist_address: App.profileData?.address || '',
   };
 
   const { data, error } = await sb.from('receipts').insert(payload).select().single();
@@ -862,11 +882,14 @@ async function previewReceiptFromDashboard(id) {
   const font = r.font_style || 'DM Sans';
   const logoHtml = r.logo_url ? `<img src="${r.logo_url}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = r.status === 'paid' ? 'paid' : 'pending';
+  const amountPaid = parseFloat(r.amount_paid || 0);
+  const docType = (r.status === 'paid' || amountPaid > 0) ? 'RECEIPT' : 'INVOICE';
   const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vat_enabled, r.vat_rate, hex, r.amount_paid);
   const accountDetailsHtml = buildAccountDetailsHTML(r.bank_name, r.account_number, r.account_name);
+  const contactHtml = buildFromContactHTML(r.artist_email || '', r.artist_phone || '', r.artist_address || '');
   const html = `
-    <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(r.artist||'')}</div></div>
-    <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">RECEIPT</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div>
+    <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(r.artist||'')}</div>${contactHtml}</div>
+    <div class="receipt-meta"><div class="receipt-title" style="color:${hex};font-family:${font}">${docType}</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div>
     <div class="receipt-body"><div class="receipt-parties">
       <div><div class="receipt-party-label">From</div><div class="receipt-party-name" style="font-family:${font}">${escapeHTML(r.artist||'')}</div></div>
       <div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name" style="font-family:${font}">${escapeHTML(r.client||'')}</div></div>
@@ -892,9 +915,12 @@ async function downloadFromDashboard(id) {
   const font = r.font_style || 'DM Sans';
   const logoHtml = r.logo_url ? `<img src="${r.logo_url}" style="max-width:120px;max-height:50px;object-fit:contain" alt="Logo">` : '';
   const statusClass = r.status === 'paid' ? 'paid' : 'pending';
+  const amountPaid = parseFloat(r.amount_paid || 0);
+  const docType = (r.status === 'paid' || amountPaid > 0) ? 'RECEIPT' : 'INVOICE';
   const amountSection = buildAmountSectionHTML(r.amount, r.currency, r.vat_enabled, r.vat_rate, hex, r.amount_paid);
   const accountDetailsHtml = buildAccountDetailsHTML(r.bank_name, r.account_number, r.account_name);
-  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${escapeHTML(r.artist||'')}</div></div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">RECEIPT</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${escapeHTML(r.artist||'')}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${escapeHTML(r.client||'')}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${escapeHTML(r.description||'—')}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
+  const contactHtml = buildFromContactHTML(r.artist_email || '', r.artist_phone || '', r.artist_address || '');
+  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${escapeHTML(r.artist||'')}</div>${contactHtml}</div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">${docType}</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${escapeHTML(r.artist||'')}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${escapeHTML(r.client||'')}</div></div></div><div class="receipt-divider"></div><div class="receipt-project-label">Project Description</div><div class="receipt-project-desc">${escapeHTML(r.description||'—')}</div>${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   buildPrintWindow(html, font, hex);
 }
 

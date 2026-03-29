@@ -641,6 +641,15 @@ select.form-input {
   color: #111;
 }
 
+.receipt-contact-details {
+  margin-top: 4px;
+}
+.receipt-contact-line {
+  font-size: 10px;
+  color: #666;
+  line-height: 1.5;
+}
+
 .receipt-meta {
   text-align: right;
 }
