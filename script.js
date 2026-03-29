@@ -315,7 +315,7 @@ async function handleForgotPassword() {
   btn.textContent = 'Sending…'; btn.disabled = true;
 
   const { error } = await sb.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/index.html'
+    redirectTo: window.location.origin
   });
 
   btn.textContent = 'Reset Password →'; btn.disabled = false;
@@ -323,6 +323,24 @@ async function handleForgotPassword() {
   if (error) return showError('forgot-email', error.message);
   toast('Password reset email sent! Check your inbox.', 'success');
   showLoginForm();
+}
+
+async function handleSetNewPassword() {
+  const pwd = $('#new-password-input').value;
+  const errEl = $('#err-new-password');
+  errEl.textContent = '';
+  if (!pwd || pwd.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; return; }
+
+  const btn = $('#btn-set-new-password');
+  btn.textContent = 'Updating…'; btn.disabled = true;
+
+  const { error } = await sb.auth.updateUser({ password: pwd });
+  btn.textContent = 'Update Password →'; btn.disabled = false;
+
+  if (error) { errEl.textContent = error.message; return; }
+  closeModal('modal-new-password');
+  toast('✅ Password updated successfully! Please log in.', 'success');
+  await sb.auth.signOut();
 }
 
 async function fetchProfile(userId) {
@@ -1092,6 +1110,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for auth state changes (e.g. password reset redirect)
   sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      openModal('modal-new-password');
+      return;
+    }
     if (event === 'SIGNED_IN' && session && !App.currentUser) {
       const profile = await fetchProfile(session.user.id);
       App.currentUser = {
@@ -1109,6 +1131,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       showPage('auth');
     }
   });
+
+  $('#btn-set-new-password').addEventListener('click', handleSetNewPassword);
 
   $$('.nav-link[data-page]').forEach(link => {
     link.addEventListener('click', () => navigateTo(link.dataset.page));
