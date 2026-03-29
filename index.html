@@ -33,6 +33,7 @@
   <div class="nav-links" id="nav-links">
     <button class="nav-link" data-page="generator">🎙 Generator</button>
     <button class="nav-link" data-page="dashboard">📊 Dashboard</button>
+    <button class="nav-link" data-page="admin" id="nav-admin-link" style="display:none">⚙ Admin</button>
     <span style="font-size:12px;color:var(--text3);padding:0 8px;display:flex;align-items:center" id="nav-username"></span>
     <button class="nav-link logout" id="btn-logout">↩ Logout</button>
     <button class="theme-toggle" id="theme-toggle" title="Toggle theme"><span id="theme-toggle-icon">☀️</span></button>
@@ -119,6 +120,15 @@
     <div class="page-header">
       <div class="page-title">RECEIPT <span>GENERATOR</span></div>
       <div class="page-subtitle">Fill in the details below — see your receipt update live on the right.</div>
+    </div>
+
+    <!-- ACCOUNT LOCKED BANNER -->
+    <div id="account-locked-banner" class="locked-banner" style="display:none">
+      <div class="locked-banner-icon">🔒</div>
+      <div>
+        <div class="locked-banner-title">Account Locked</div>
+        <div class="locked-banner-sub">Kindly Subscribe to Unlock access to the Receipt Generator.</div>
+      </div>
     </div>
 
     <div class="generator-layout">
@@ -406,6 +416,59 @@
         <input class="form-input" type="text" id="payment-note" placeholder="e.g. Bank transfer, partial payment">
       </div>
       <button class="btn btn-primary btn-full" id="btn-record-payment">💰 Record Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PAGE: ADMIN PORTAL                         -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-admin" class="page">
+  <div class="main">
+    <div class="page-header">
+      <div class="page-title">ADMIN <span>PORTAL</span></div>
+      <div class="page-subtitle">Manage all registered accounts, subscriptions and activity.</div>
+    </div>
+
+    <div class="dashboard-stats" style="margin-bottom:28px">
+      <div class="stat-card">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value accent" id="admin-stat-users">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active</div>
+        <div class="stat-value" id="admin-stat-active">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Locked</div>
+        <div class="stat-value" style="color:var(--yellow)" id="admin-stat-locked">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Receipts</div>
+        <div class="stat-value" id="admin-stat-receipts">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-value" id="admin-stat-revenue" style="font-size:18px">—</div>
+      </div>
+    </div>
+
+    <div class="receipts-table-wrap">
+      <div class="table-header admin-table-header">
+        <div class="table-col-label">User</div>
+        <div class="table-col-label">Email</div>
+        <div class="table-col-label">Joined</div>
+        <div class="table-col-label">Receipts</div>
+        <div class="table-col-label">Revenue</div>
+        <div class="table-col-label">Status</div>
+        <div class="table-col-label" style="text-align:right">Access</div>
+      </div>
+      <div id="admin-users-list">
+        <div class="empty-state">
+          <div class="empty-icon">👤</div>
+          <div class="empty-title">LOADING USERS…</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

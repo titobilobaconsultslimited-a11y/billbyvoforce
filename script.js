@@ -266,7 +266,13 @@ async function handleLogin() {
   }
 
   const profile = await fetchProfile(data.user.id);
-  App.currentUser = { id: data.user.id, email: data.user.email, name: profile?.name || email };
+  App.currentUser = {
+    id: data.user.id,
+    email: data.user.email,
+    name: profile?.name || email,
+    isLocked: profile?.is_locked || false,
+    isAdmin: profile?.is_admin || false,
+  };
   enterApp();
 }
 
@@ -294,7 +300,7 @@ async function handleSignup() {
   // Insert profile manually in case trigger hasn't fired yet
   if (data.user) {
     await sb.from('profiles').upsert({ id: data.user.id, name, email });
-    App.currentUser = { id: data.user.id, email, name };
+    App.currentUser = { id: data.user.id, email, name, isLocked: false, isAdmin: false };
     enterApp();
     toast(`Welcome, ${name}! 🎙️`, 'success');
   }
@@ -342,6 +348,8 @@ function clearErrors() {
 function enterApp() {
   showNav(true);
   updateNavUser();
+  const adminLink = $('#nav-admin-link');
+  if (adminLink) adminLink.style.display = App.currentUser?.isAdmin ? 'flex' : 'none';
   showPage('generator');
   initGenerator();
   initDashboard();
@@ -366,6 +374,16 @@ function updateNavUser() {
 
 // ─── GENERATOR ────────────────────────────────
 function initGenerator() {
+  if (App.currentUser?.isLocked) {
+    $('#account-locked-banner').style.display = 'flex';
+    $('#generator-form').style.display = 'none';
+    // Hide branding/payment panels too
+    $$('#page-generator .panel').forEach(p => p.style.display = 'none');
+    return;
+  }
+  $('#account-locked-banner').style.display = 'none';
+  $$('#page-generator .panel').forEach(p => p.style.display = '');
+
   if (App.currentUser) $('#field-artist').value = App.currentUser.name;
   $('#field-date').value = new Date().toISOString().split('T')[0];
   initColorPicker();
@@ -561,6 +579,7 @@ function updatePreview() {
 // ── SAVE RECEIPT TO SUPABASE ──
 async function saveReceipt() {
   if (!App.currentUser) return;
+  if (App.currentUser.isLocked) { toast('🔒 Account locked. Subscribe to unlock.', 'error'); return; }
   const client = $('#field-client').value.trim();
   const amount = $('#field-amount').value;
   if (!client) { toast('Please enter a client name', 'error'); return; }
@@ -653,6 +672,7 @@ function newReceipt() {
 }
 
 function sendReceiptEmail() {
+  if (App.currentUser?.isLocked) { toast('🔒 Account locked. Subscribe to unlock.', 'error'); return; }
   const clientEmail = $('#field-client-email').value.trim();
   if (!clientEmail || !clientEmail.includes('@')) { toast('Please enter a valid client email', 'error'); return; }
   const artist = $('#field-artist').value.trim() || App.currentUser?.name || '';
@@ -676,6 +696,7 @@ function sendReceiptEmail() {
 }
 
 function downloadReceipt() {
+  if (App.currentUser?.isLocked) { toast('🔒 Account locked. Subscribe to unlock.', 'error'); return; }
   buildPrintWindow($('#receipt-preview').innerHTML, $('#field-font').value || 'DM Sans', App.brandColor);
 }
 
@@ -983,10 +1004,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     App.currentUser = {
       id: session.user.id,
       email: session.user.email,
-      name: profile?.name || session.user.email
+      name: profile?.name || session.user.email,
+      isLocked: profile?.is_locked || false,
+      isAdmin: profile?.is_admin || false,
     };
     showNav(true);
     updateNavUser();
+    const adminLink = $('#nav-admin-link');
+    if (adminLink) adminLink.style.display = App.currentUser.isAdmin ? 'flex' : 'none';
     showPage('generator');
     initGenerator();
     initDashboard();
@@ -1002,7 +1027,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       App.currentUser = {
         id: session.user.id,
         email: session.user.email,
-        name: profile?.name || session.user.email
+        name: profile?.name || session.user.email,
+        isLocked: profile?.is_locked || false,
+        isAdmin: profile?.is_admin || false,
       };
       enterApp();
     }
