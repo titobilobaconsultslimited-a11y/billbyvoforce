@@ -229,69 +229,14 @@
           </div>
         </div>
 
-        <!-- BRANDING -->
-        <div class="panel">
-          <div class="panel-title">
-            <div class="icon">🎨</div>BRANDING
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Brand Color</label>
-            <div class="color-picker-wrap">
-              <div class="color-swatch">
-                <div class="color-swatch-preview" id="color-swatch-preview"></div>
-                <input type="color" id="color-picker-input" value="#e63030">
-              </div>
-              <div class="color-presets">
-                <div class="color-preset" data-color="#e63030" title="VOForce Red"></div>
-                <div class="color-preset" data-color="#2563eb" title="Studio Blue"></div>
-                <div class="color-preset" data-color="#16a34a" title="Sage Green"></div>
-                <div class="color-preset" data-color="#7c3aed" title="Royal Purple"></div>
-                <div class="color-preset" data-color="#d97706" title="Gold"></div>
-                <div class="color-preset" data-color="#111111" title="Midnight"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Upload Logo</label>
-            <div class="logo-upload-area" id="logo-upload-area">
-              <div class="logo-upload-icon">📎</div>
-              <div class="logo-upload-text">Upload Your Logo</div>
-              <div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div>
-              <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="field-font">Font Style</label>
-            <select class="form-input" id="field-font">
-              <option value="DM Sans">DM Sans (Modern)</option>
-              <option value="Playfair Display">Playfair Display (Elegant)</option>
-              <option value="JetBrains Mono">JetBrains Mono (Technical)</option>
-              <option value="Syne">Syne (Bold)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- PAYMENT DETAILS -->
-        <div class="panel" style="margin-top:20px">
-          <div class="panel-title">
-            <div class="icon">🏦</div>PAYMENT DETAILS
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="field-bank-name">Bank Name</label>
-            <input class="form-input" type="text" id="field-bank-name" placeholder="e.g. GTBank, Zenith Bank">
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="field-account-number">Account Number</label>
-              <input class="form-input" type="text" id="field-account-number" placeholder="0123456789" maxlength="20">
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="field-account-name">Account Name</label>
-              <input class="form-input" type="text" id="field-account-name" placeholder="Your business account name">
-            </div>
+        <!-- hidden inputs keep generator JS working without UI fields -->
+        <input type="hidden" id="field-bank-name">
+        <input type="hidden" id="field-account-number">
+        <input type="hidden" id="field-account-name">
+        <input type="hidden" id="field-font" value="DM Sans">
+        <div style="display:none">
+          <div class="logo-upload-area" id="logo-upload-area" style="position:relative">
+            <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
           </div>
         </div>
       </div>
@@ -455,6 +400,39 @@
           <div class="form-group" style="grid-column:1/-1">
             <label class="form-label" for="profile-account-name">Account Name</label>
             <input class="form-input" type="text" id="profile-account-name" placeholder="e.g. Teebee Voices Limited">
+          </div>
+        </div>
+      </div>
+
+      <!-- Branding Section -->
+      <div class="profile-section">
+        <div class="profile-section-label">🎨 BRANDING</div>
+        <div class="profile-grid">
+          <div class="form-group">
+            <label class="form-label">Brand Color</label>
+            <div class="color-picker-wrap">
+              <div class="color-swatch">
+                <div class="color-swatch-preview" id="color-swatch-preview"></div>
+                <input type="color" id="color-picker-input" value="#e63030">
+              </div>
+              <div class="color-presets">
+                <div class="color-preset" data-color="#e63030" title="VOForce Red"></div>
+                <div class="color-preset" data-color="#2563eb" title="Studio Blue"></div>
+                <div class="color-preset" data-color="#16a34a" title="Sage Green"></div>
+                <div class="color-preset" data-color="#7c3aed" title="Royal Purple"></div>
+                <div class="color-preset" data-color="#d97706" title="Gold"></div>
+                <div class="color-preset" data-color="#111111" title="Midnight"></div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="profile-font">Font Style</label>
+            <select class="form-input" id="profile-font">
+              <option value="DM Sans">DM Sans (Modern)</option>
+              <option value="Playfair Display">Playfair Display (Elegant)</option>
+              <option value="JetBrains Mono">JetBrains Mono (Technical)</option>
+              <option value="Syne">Syne (Bold)</option>
+            </select>
           </div>
         </div>
       </div>

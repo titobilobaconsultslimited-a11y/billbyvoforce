@@ -335,6 +335,8 @@ async function fetchProfile(userId) {
       App.savedLogoUrl = data.logo_url;
       App.logoBase64 = data.logo_url;
     }
+    if (data.brand_color) App.brandColor = data.brand_color;
+    if (data.font_style) App.fontStyle = data.font_style;
     App.profileData = {
       name: data.name || '',
       phone: data.phone || '',
@@ -342,6 +344,8 @@ async function fetchProfile(userId) {
       bankName: data.bank_name || '',
       accountNumber: data.account_number || '',
       accountName: data.account_name || '',
+      brandColor: data.brand_color || '#e63030',
+      fontStyle: data.font_style || 'DM Sans',
     };
   }
   return data;
@@ -400,22 +404,21 @@ function updateNavUser() {
 function initGenerator() {
   if (App.currentUser) $('#field-artist').value = App.currentUser.name;
   $('#field-date').value = new Date().toISOString().split('T')[0];
-  initColorPicker();
   initServiceQuickFill();
+
+  // Apply saved branding
+  const fontEl = $('#field-font');
+  if (fontEl) fontEl.value = App.fontStyle || 'DM Sans';
 
   // Pre-fill bank details from profile
   if (App.profileData) {
-    if (!$('#field-bank-name').value) $('#field-bank-name').value = App.profileData.bankName || '';
-    if (!$('#field-account-number').value) $('#field-account-number').value = App.profileData.accountNumber || '';
-    if (!$('#field-account-name').value) $('#field-account-name').value = App.profileData.accountName || '';
+    $('#field-bank-name').value = App.profileData.bankName || '';
+    $('#field-account-number').value = App.profileData.accountNumber || '';
+    $('#field-account-name').value = App.profileData.accountName || '';
   }
 
-  // Restore saved logo from profile
-  restoreLogoInArea('#logo-upload-area', '#logo-upload', handleLogoUpload);
-
-  const logoArea = $('#logo-upload-area');
-  logoArea.onclick = () => $('#logo-upload').click();
-  $('#logo-upload').addEventListener('change', handleLogoUpload);
+  // Restore saved logo from profile (hidden area, just keeps App.logoBase64 in sync)
+  // logo-upload-area is now hidden; no UI restore needed
 
   $$('#generator-form input, #generator-form select, #generator-form textarea').forEach(el => {
     el.addEventListener('input', updatePreview);
@@ -564,7 +567,7 @@ function updatePreview() {
   const currency = $('#field-currency').value || 'NGN';
   const date = $('#field-date').value;
   const status = $('#field-status').value || 'paid';
-  const font = $('#field-font').value || 'DM Sans';
+  const font = App.fontStyle || $('#field-font')?.value || 'DM Sans';
   const vatEnabled = $('#field-vat-toggle').checked;
   const vatRate = $('#field-vat-rate').value || '7.5';
   const bankName = $('#field-bank-name')?.value || '';
@@ -681,15 +684,26 @@ function newReceipt() {
   $('#field-vat-toggle').checked = false;
   $('#field-vat-rate').value = '7.5';
   $('#vat-rate-group').style.display = 'none';
-  // Restore bank details from profile
+function newReceipt() {
+  App.currentReceipt = null;
+  App.logoBase64 = App.savedLogoUrl || null; // keep saved logo
+  App.logoFile = null;
+  $('#field-client').value = '';
+  $('#field-client-email').value = '';
+  $('#field-desc').value = '';
+  $('#field-amount').value = '';
+  $('#field-currency').value = 'NGN';
+  $('#field-status').value = 'paid';
+  $('#field-date').value = new Date().toISOString().split('T')[0];
+  $('#field-vat-toggle').checked = false;
+  $('#field-vat-rate').value = '7.5';
+  $('#vat-rate-group').style.display = 'none';
+  // Restore bank details + font from profile
   $('#field-bank-name').value = App.profileData?.bankName || '';
   $('#field-account-number').value = App.profileData?.accountNumber || '';
   $('#field-account-name').value = App.profileData?.accountName || '';
-  // Restore saved logo
-  restoreLogoInArea('#logo-upload-area', '#logo-upload', handleLogoUpload);
-  const area = $('#logo-upload-area');
-  area.onclick = () => $('#logo-upload').click();
-  $('#logo-upload').addEventListener('change', handleLogoUpload);
+  const fontEl = $('#field-font');
+  if (fontEl) fontEl.value = App.fontStyle || 'DM Sans';
   updatePreview();
   toast('New receipt started', 'info');
 }
@@ -994,9 +1008,16 @@ function initProfile(isNewUser = false) {
   if ($('#profile-account-number')) $('#profile-account-number').value = p.accountNumber || '';
   if ($('#profile-account-name')) $('#profile-account-name').value = p.accountName || '';
 
+  // Logo
   restoreLogoInArea('#profile-logo-area', '#profile-logo-upload', handleProfileLogoUpload);
   const area = $('#profile-logo-area');
   if (area) area.onclick = () => $('#profile-logo-upload').click();
+
+  // Branding
+  initColorPicker();
+  const fontSel = $('#profile-font');
+  if (fontSel) fontSel.value = App.fontStyle || 'DM Sans';
+  if (fontSel) fontSel.addEventListener('change', e => { App.fontStyle = e.target.value; });
 
   $('#btn-save-profile').onclick = saveProfile;
   $('#btn-profile-back').onclick = () => navigateTo('generator');
@@ -1028,6 +1049,8 @@ async function saveProfile() {
     bank_name: bankName,
     account_number: accountNumber,
     account_name: accountName,
+    brand_color: App.brandColor,
+    font_style: App.fontStyle,
     logo_url: App.savedLogoUrl || null,
   }).eq('id', App.currentUser.id);
 
@@ -1036,7 +1059,7 @@ async function saveProfile() {
   if (error) { errEl.textContent = 'Save failed: ' + error.message; return; }
 
   App.currentUser.name = name;
-  App.profileData = { name, phone, address, bankName, accountNumber, accountName };
+  App.profileData = { name, phone, address, bankName, accountNumber, accountName, brandColor: App.brandColor, fontStyle: App.fontStyle };
   updateNavUser();
   $('#nav-profile-link').style.display = 'inline-flex';
   if (App.currentUser?.isAdmin) $('#nav-admin-link').style.display = 'inline-flex';
