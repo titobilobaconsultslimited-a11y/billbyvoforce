@@ -56,6 +56,20 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 
+/* ─── MIC BACKGROUND IMAGE ─── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url('Media/mic.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* ─── NOISE TEXTURE OVERLAY ─── */
 body::before {
   content: '';
@@ -210,6 +224,8 @@ body::before {
 .page {
   display: none;
   animation: fadeUp 0.35s ease both;
+  position: relative;
+  z-index: 1;
 }
 .page.active { display: block; }
 
