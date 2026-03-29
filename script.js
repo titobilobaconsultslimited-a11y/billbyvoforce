@@ -722,7 +722,6 @@ function updatePreview() {
       <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div>
     </div>`;
 }
-}
 
 // ── SAVE RECEIPT TO SUPABASE ──
 async function saveReceipt() {
