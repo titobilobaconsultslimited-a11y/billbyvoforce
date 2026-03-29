@@ -34,6 +34,7 @@
     <button class="nav-link" data-page="generator">🎙 Generator</button>
     <button class="nav-link" data-page="dashboard">📊 Dashboard</button>
     <button class="nav-link" data-page="admin" id="nav-admin-link" style="display:none">⚙ Admin</button>
+    <button class="nav-link" data-page="profile" id="nav-profile-link" style="display:none">👤 Profile</button>
     <span style="font-size:12px;color:var(--text3);padding:0 8px;display:flex;align-items:center" id="nav-username"></span>
     <button class="nav-link logout" id="btn-logout">↩ Logout</button>
     <button class="theme-toggle" id="theme-toggle" title="Toggle theme"><span id="theme-toggle-icon">☀️</span></button>
@@ -390,6 +391,79 @@
     <div class="modal-body">
       <div id="modal-receipt-preview" class="receipt-preview" style="margin-bottom:20px"></div>
       <button class="btn btn-primary btn-full" id="modal-download-btn">🖨 Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ -->
+<!-- PAGE: PROFILE                              -->
+<!-- ══════════════════════════════════════════ -->
+<div id="page-profile" class="page">
+  <div class="main">
+    <div class="page-header">
+      <div class="page-title">YOUR <span>PROFILE</span></div>
+      <div class="page-subtitle" id="profile-page-subtitle">Set up your business profile — it auto-fills every receipt you create.</div>
+    </div>
+
+    <div class="profile-card">
+      <!-- Logo -->
+      <div class="profile-section">
+        <div class="profile-section-label">BUSINESS LOGO</div>
+        <div id="profile-logo-area" class="logo-upload-area" style="position:relative;cursor:pointer;max-width:280px">
+          <div class="logo-upload-icon">📎</div>
+          <div class="logo-upload-text">Upload Your Logo</div>
+          <div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div>
+          <input type="file" id="profile-logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+        </div>
+      </div>
+
+      <!-- Business Info -->
+      <div class="profile-section">
+        <div class="profile-section-label">BUSINESS DETAILS</div>
+        <div class="profile-grid">
+          <div class="form-group">
+            <label class="form-label" for="profile-name">Business / Artist Name</label>
+            <input class="form-input" type="text" id="profile-name" placeholder="e.g. Teebee Voices Limited">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="profile-email">Email Address</label>
+            <input class="form-input" type="email" id="profile-email" readonly style="opacity:0.55;cursor:not-allowed">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="profile-phone">Phone Number <span class="form-label-opt">(optional)</span></label>
+            <input class="form-input" type="tel" id="profile-phone" placeholder="+234 800 000 0000">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label" for="profile-address">Business Address <span class="form-label-opt">(optional)</span></label>
+            <textarea class="form-input" id="profile-address" rows="2" placeholder="e.g. 12 Studio Lane, Lekki, Lagos" style="resize:vertical"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bank / Payment Details -->
+      <div class="profile-section">
+        <div class="profile-section-label">PAYMENT DETAILS</div>
+        <div class="profile-grid">
+          <div class="form-group">
+            <label class="form-label" for="profile-bank-name">Bank Name</label>
+            <input class="form-input" type="text" id="profile-bank-name" placeholder="e.g. Zenith Bank">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="profile-account-number">Account Number</label>
+            <input class="form-input" type="text" id="profile-account-number" placeholder="e.g. 0123456789" maxlength="10">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label" for="profile-account-name">Account Name</label>
+            <input class="form-input" type="text" id="profile-account-name" placeholder="e.g. Teebee Voices Limited">
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-primary" id="btn-save-profile" style="flex:1;min-width:160px">💾 Save Profile</button>
+        <button class="btn btn-secondary" id="btn-profile-back" style="flex:1;min-width:160px">← Back to Generator</button>
+      </div>
+      <div id="profile-save-error" style="color:var(--accent);font-size:12px;margin-top:10px;text-align:center"></div>
     </div>
   </div>
 </div>

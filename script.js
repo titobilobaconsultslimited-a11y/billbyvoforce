@@ -93,13 +93,15 @@ const AVOA_SERVICES = {
 
 // ─── STATE ───────────────────────────────────
 const App = {
-  currentUser: null,   // { id, email, name }
+  currentUser: null,   // { id, email, name, isLocked, isAdmin }
   currentReceipt: null,
   logoBase64: null,    // preview only; actual upload goes to Supabase Storage
   logoFile: null,      // File object for upload
   brandColor: '#e63030',
   fontStyle: 'DM Sans',
   savedLogoUrl: null,  // permanent logo from profile
+  profileData: null,   // { name, phone, address, bankName, accountNumber, accountName }
+  profileLogoFile: null,
 };
 
 // ─── HELPERS ─────────────────────────────────
@@ -266,7 +268,13 @@ async function handleLogin() {
   }
 
   const profile = await fetchProfile(data.user.id);
-  App.currentUser = { id: data.user.id, email: data.user.email, name: profile?.name || email };
+  App.currentUser = {
+    id: data.user.id,
+    email: data.user.email,
+    name: profile?.name || email,
+    isLocked: profile?.is_locked || false,
+    isAdmin: profile?.is_admin || false,
+  };
   enterApp();
 }
 
@@ -294,9 +302,10 @@ async function handleSignup() {
   // Insert profile manually in case trigger hasn't fired yet
   if (data.user) {
     await sb.from('profiles').upsert({ id: data.user.id, name, email });
-    App.currentUser = { id: data.user.id, email, name };
-    enterApp();
-    toast(`Welcome, ${name}! 🎙️`, 'success');
+    App.currentUser = { id: data.user.id, email, name, isLocked: false, isAdmin: false };
+    App.profileData = { name, phone: '', address: '', bankName: '', accountNumber: '', accountName: '' };
+    enterApp(true); // go to profile setup first
+    toast(`Welcome, ${name}! Complete your profile below. 🎙️`, 'success');
   }
 }
 
@@ -321,9 +330,19 @@ async function handleForgotPassword() {
 
 async function fetchProfile(userId) {
   const { data } = await sb.from('profiles').select('*').eq('id', userId).single();
-  if (data?.logo_url) {
-    App.savedLogoUrl = data.logo_url;
-    App.logoBase64 = data.logo_url;
+  if (data) {
+    if (data.logo_url) {
+      App.savedLogoUrl = data.logo_url;
+      App.logoBase64 = data.logo_url;
+    }
+    App.profileData = {
+      name: data.name || '',
+      phone: data.phone || '',
+      address: data.address || '',
+      bankName: data.bank_name || '',
+      accountNumber: data.account_number || '',
+      accountName: data.account_name || '',
+    };
   }
   return data;
 }
@@ -343,12 +362,19 @@ function clearErrors() {
   $$('.form-input').forEach(f => f.style.borderColor = '');
 }
 
-function enterApp() {
+function enterApp(goToProfile = false) {
   showNav(true);
   updateNavUser();
-  showPage('generator');
-  initGenerator();
+  $('#nav-profile-link').style.display = 'inline-flex';
+  if (App.currentUser?.isAdmin) $('#nav-admin-link').style.display = 'inline-flex';
   initDashboard();
+  if (goToProfile) {
+    showPage('profile');
+    initProfile(true);
+  } else {
+    showPage('generator');
+    initGenerator();
+  }
 }
 
 async function handleLogout() {
@@ -365,6 +391,9 @@ async function handleLogout() {
 function updateNavUser() {
   const el = $('#nav-username');
   if (el && App.currentUser) el.textContent = App.currentUser.name;
+  // Hide admin/profile links by default; enterApp shows them
+  $('#nav-admin-link').style.display = 'none';
+  $('#nav-profile-link').style.display = 'none';
 }
 
 // ─── GENERATOR ────────────────────────────────
@@ -374,14 +403,15 @@ function initGenerator() {
   initColorPicker();
   initServiceQuickFill();
 
-  // Restore saved logo from profile
-  if (App.savedLogoUrl) {
-    const area = $('#logo-upload-area');
-    area.innerHTML = `<img src="${App.savedLogoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
-      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
-      <input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
-    area.style.padding = '16px';
+  // Pre-fill bank details from profile
+  if (App.profileData) {
+    if (!$('#field-bank-name').value) $('#field-bank-name').value = App.profileData.bankName || '';
+    if (!$('#field-account-number').value) $('#field-account-number').value = App.profileData.accountNumber || '';
+    if (!$('#field-account-name').value) $('#field-account-name').value = App.profileData.accountName || '';
   }
+
+  // Restore saved logo from profile
+  restoreLogoInArea('#logo-upload-area', '#logo-upload', handleLogoUpload);
 
   const logoArea = $('#logo-upload-area');
   logoArea.onclick = () => $('#logo-upload').click();
@@ -498,6 +528,22 @@ function handleLogoUpload(e) {
     }
   };
   reader.readAsDataURL(file);
+}
+
+function restoreLogoInArea(areaSelector, inputSelector, changeHandler) {
+  const area = $(areaSelector);
+  if (!area) return;
+  if (App.savedLogoUrl) {
+    area.innerHTML = `<img src="${App.savedLogoUrl}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
+      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
+      <input type="file" id="${inputSelector.replace('#','')}" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '16px';
+  } else {
+    area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="${inputSelector.replace('#','')}" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '24px';
+  }
+  const input = $(inputSelector);
+  if (input) input.addEventListener('change', changeHandler);
 }
 
 async function uploadLogo(file, userId) {
@@ -623,7 +669,7 @@ async function saveReceipt() {
 
 function newReceipt() {
   App.currentReceipt = null;
-  App.logoBase64 = null;
+  App.logoBase64 = App.savedLogoUrl || null; // keep saved logo
   App.logoFile = null;
   $('#field-client').value = '';
   $('#field-client-email').value = '';
@@ -635,12 +681,13 @@ function newReceipt() {
   $('#field-vat-toggle').checked = false;
   $('#field-vat-rate').value = '7.5';
   $('#vat-rate-group').style.display = 'none';
-  $('#field-bank-name').value = '';
-  $('#field-account-number').value = '';
-  $('#field-account-name').value = '';
+  // Restore bank details from profile
+  $('#field-bank-name').value = App.profileData?.bankName || '';
+  $('#field-account-number').value = App.profileData?.accountNumber || '';
+  $('#field-account-name').value = App.profileData?.accountName || '';
+  // Restore saved logo
+  restoreLogoInArea('#logo-upload-area', '#logo-upload', handleLogoUpload);
   const area = $('#logo-upload-area');
-  area.innerHTML = `<div class="logo-upload-icon">📎</div><div class="logo-upload-text">Upload Your Logo</div><div class="logo-upload-hint">PNG, JPG, SVG — Max 2MB</div><input type="file" id="logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
-  area.style.padding = '24px';
   area.onclick = () => $('#logo-upload').click();
   $('#logo-upload').addEventListener('change', handleLogoUpload);
   updatePreview();
@@ -921,10 +968,164 @@ function closeModal(id) { document.getElementById(id)?.classList.remove('open');
 // ─── NAVIGATION ───────────────────────────────
 function navigateTo(page) {
   if (!App.currentUser && page !== 'auth') { showPage('auth'); return; }
+  if (page === 'admin' && !App.currentUser?.isAdmin) { showPage('generator'); return; }
   showPage(page);
   if (page === 'dashboard') renderDashboard();
-  if (page === 'generator') updatePreview();
+  if (page === 'generator') { initGenerator(); updatePreview(); }
+  if (page === 'admin') initAdmin();
+  if (page === 'profile') initProfile(false);
   $('#nav-links').classList.remove('open');
+}
+
+// ─── PROFILE ──────────────────────────────────────────────────────────────────
+function initProfile(isNewUser = false) {
+  const subtitle = $('#profile-page-subtitle');
+  if (subtitle) subtitle.textContent = isNewUser
+    ? 'Welcome! Complete your profile — it auto-fills every receipt you create.'
+    : 'Update your business profile. Changes apply to all future receipts.';
+
+  const u = App.currentUser;
+  const p = App.profileData || {};
+  if ($('#profile-name')) $('#profile-name').value = p.name || u?.name || '';
+  if ($('#profile-email')) $('#profile-email').value = u?.email || '';
+  if ($('#profile-phone')) $('#profile-phone').value = p.phone || '';
+  if ($('#profile-address')) $('#profile-address').value = p.address || '';
+  if ($('#profile-bank-name')) $('#profile-bank-name').value = p.bankName || '';
+  if ($('#profile-account-number')) $('#profile-account-number').value = p.accountNumber || '';
+  if ($('#profile-account-name')) $('#profile-account-name').value = p.accountName || '';
+
+  restoreLogoInArea('#profile-logo-area', '#profile-logo-upload', handleProfileLogoUpload);
+  const area = $('#profile-logo-area');
+  if (area) area.onclick = () => $('#profile-logo-upload').click();
+
+  $('#btn-save-profile').onclick = saveProfile;
+  $('#btn-profile-back').onclick = () => navigateTo('generator');
+}
+
+async function saveProfile() {
+  const name = $('#profile-name').value.trim();
+  const phone = $('#profile-phone').value.trim();
+  const address = $('#profile-address').value.trim();
+  const bankName = $('#profile-bank-name').value.trim();
+  const accountNumber = $('#profile-account-number').value.trim();
+  const accountName = $('#profile-account-name').value.trim();
+  const errEl = $('#profile-save-error');
+  errEl.textContent = '';
+
+  if (!name) { errEl.textContent = 'Business name is required'; return; }
+
+  const btn = $('#btn-save-profile');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+
+  if (App.profileLogoFile) {
+    const logoUrl = await uploadLogo(App.profileLogoFile, App.currentUser.id);
+    if (logoUrl) { App.savedLogoUrl = logoUrl; App.logoBase64 = logoUrl; }
+    App.profileLogoFile = null;
+  }
+
+  const { error } = await sb.from('profiles').update({
+    name, phone, address,
+    bank_name: bankName,
+    account_number: accountNumber,
+    account_name: accountName,
+    logo_url: App.savedLogoUrl || null,
+  }).eq('id', App.currentUser.id);
+
+  btn.textContent = '💾 Save Profile'; btn.disabled = false;
+
+  if (error) { errEl.textContent = 'Save failed: ' + error.message; return; }
+
+  App.currentUser.name = name;
+  App.profileData = { name, phone, address, bankName, accountNumber, accountName };
+  updateNavUser();
+  $('#nav-profile-link').style.display = 'inline-flex';
+  if (App.currentUser?.isAdmin) $('#nav-admin-link').style.display = 'inline-flex';
+
+  toast('✅ Profile saved!', 'success');
+  setTimeout(() => navigateTo('generator'), 800);
+}
+
+function handleProfileLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('Logo must be under 2MB', 'error'); return; }
+  App.profileLogoFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    App.savedLogoUrl = ev.target.result;
+    App.logoBase64 = ev.target.result;
+    const area = $('#profile-logo-area');
+    area.innerHTML = `<img src="${ev.target.result}" class="logo-preview-img" alt="Logo" style="pointer-events:none">
+      <div class="logo-upload-hint" style="margin-top:8px;color:var(--text3);font-size:12px">Click to change</div>
+      <input type="file" id="profile-logo-upload" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">`;
+    area.style.padding = '16px';
+    $('#profile-logo-upload').addEventListener('change', handleProfileLogoUpload);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─── ADMIN ────────────────────────────────────────────────────────────────────
+async function initAdmin() {
+  if (!App.currentUser?.isAdmin) { showPage('generator'); return; }
+  await renderAdminUsers();
+}
+
+async function renderAdminUsers() {
+  const { data: profiles, error } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
+  if (error) {
+    toast('Failed to load users: ' + error.message, 'error');
+    $('#admin-users-list').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">ERROR LOADING USERS</div><div class="empty-sub">${escapeHTML(error.message)}</div></div>`;
+    return;
+  }
+  if (!profiles || profiles.length === 0) {
+    $('#admin-users-list').innerHTML = '<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">NO USERS YET</div></div>';
+    return;
+  }
+
+  const { data: receipts } = await sb.from('receipts').select('user_id, amount_paid, currency');
+  const receiptMap = {};
+  (receipts || []).forEach(r => {
+    if (!receiptMap[r.user_id]) receiptMap[r.user_id] = { count: 0, paid: 0 };
+    receiptMap[r.user_id].count++;
+    receiptMap[r.user_id].paid += parseFloat(r.amount_paid || 0);
+  });
+  const totalRevenue = (receipts || []).reduce((sum, r) => sum + parseFloat(r.amount_paid || 0), 0);
+
+  $('#admin-stat-users').textContent = profiles.length;
+  $('#admin-stat-active').textContent = profiles.filter(p => !p.is_locked).length;
+  $('#admin-stat-locked').textContent = profiles.filter(p => p.is_locked).length;
+  $('#admin-stat-receipts').textContent = (receipts || []).length;
+  $('#admin-stat-revenue').textContent = formatAmount(totalRevenue, 'NGN');
+
+  const list = $('#admin-users-list');
+  list.innerHTML = profiles.map(p => {
+    const stats = receiptMap[p.id] || { count: 0, paid: 0 };
+    const locked = p.is_locked || false;
+    const joined = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+    return `
+    <div class="table-row admin-table-row">
+      <div class="table-cell"><div style="font-weight:600">${escapeHTML(p.name || '—')}</div></div>
+      <div class="table-cell muted" style="font-size:11px;word-break:break-all">${escapeHTML(p.email || '—')}</div>
+      <div class="table-cell muted" style="font-size:11px">${joined}</div>
+      <div class="table-cell mono">${stats.count}</div>
+      <div class="table-cell mono" style="font-size:11px">${formatAmount(stats.paid, 'NGN')}</div>
+      <div class="table-cell"><span class="status-pill ${locked ? 'pending' : 'paid'}">${locked ? '🔒 LOCKED' : '✓ ACTIVE'}</span></div>
+      <div class="table-cell" style="text-align:right">
+        <label class="toggle-switch" title="${locked ? 'Unlock Account' : 'Lock Account'}">
+          <input type="checkbox" ${locked ? '' : 'checked'} onchange="toggleUserLock('${p.id}', ${locked})">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleUserLock(userId, currentlyLocked) {
+  const newState = !currentlyLocked;
+  const { error } = await sb.from('profiles').update({ is_locked: newState }).eq('id', userId);
+  if (error) { toast('Update failed: ' + error.message, 'error'); return; }
+  toast(newState ? '🔒 Account locked' : '✅ Account unlocked', newState ? 'info' : 'success');
+  renderAdminUsers();
 }
 
 // ─── THEME ────────────────────────────────────
@@ -966,17 +1167,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Listen for auth state changes (e.g. password reset redirect)
   sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      openModal('modal-new-password');
+      return;
+    }
     if (event === 'SIGNED_IN' && session && !App.currentUser) {
       const profile = await fetchProfile(session.user.id);
       App.currentUser = {
         id: session.user.id,
         email: session.user.email,
-        name: profile?.name || session.user.email
+        name: profile?.name || session.user.email,
+        isLocked: profile?.is_locked || false,
+        isAdmin: profile?.is_admin || false,
       };
       enterApp();
     }
     if (event === 'SIGNED_OUT') {
       App.currentUser = null;
+      App.profileData = null;
+      App.savedLogoUrl = null;
+      App.logoBase64 = null;
       showNav(false);
       showPage('auth');
     }
