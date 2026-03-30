@@ -1271,29 +1271,62 @@ async function renderAdminUsers() {
     const stats = receiptMap[p.id] || { count: 0, paid: 0 };
     const locked = p.is_locked || false;
     const joined = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+    const isSelf = p.id === App.currentUser?.id;
     return `
-    <div class="table-row admin-table-row">
+    <div class="table-row admin-table-row" id="admin-row-${p.id}">
       <div class="table-cell"><div style="font-weight:600">${escapeHTML(p.name || '—')}</div></div>
       <div class="table-cell muted" style="font-size:11px;word-break:break-all">${escapeHTML(p.email || '—')}</div>
       <div class="table-cell muted" style="font-size:11px">${joined}</div>
       <div class="table-cell mono">${stats.count}</div>
       <div class="table-cell mono" style="font-size:11px">${formatAmount(stats.paid, 'NGN')}</div>
-      <div class="table-cell"><span class="status-pill ${locked ? 'pending' : 'paid'}">${locked ? '🔒 LOCKED' : '✓ ACTIVE'}</span></div>
+      <div class="table-cell" id="admin-status-${p.id}"><span class="status-pill ${locked ? 'pending' : 'paid'}">${locked ? '🔒 LOCKED' : '✓ ACTIVE'}</span></div>
       <div class="table-cell" style="text-align:right">
         <label class="toggle-switch" title="${locked ? 'Unlock Account' : 'Lock Account'}">
-          <input type="checkbox" ${locked ? '' : 'checked'} onchange="toggleUserLock('${p.id}', ${locked})">
+          <input type="checkbox" ${locked ? '' : 'checked'} onchange="toggleUserLock('${p.id}', ${locked}, this)">
           <span class="toggle-slider"></span>
         </label>
+      </div>
+      <div class="table-cell" style="text-align:right">
+        ${isSelf ? '<span style="font-size:11px;color:var(--text3)">—</span>' : `<button class="btn btn-danger btn-sm btn-icon" title="Delete Account" onclick="deleteAdminUser('${p.id}','${escapeHTML(p.name||p.email||'this user')}')">🗑</button>`}
       </div>
     </div>`;
   }).join('');
 }
 
-async function toggleUserLock(userId, currentlyLocked) {
-  const newState = !currentlyLocked;
-  const { error } = await sb.from('profiles').update({ is_locked: newState }).eq('id', userId);
-  if (error) { toast('Update failed: ' + error.message, 'error'); return; }
-  toast(newState ? '🔒 Account locked' : '✅ Account unlocked', newState ? 'info' : 'success');
+async function toggleUserLock(userId, currentlyLocked, checkbox) {
+  const newLocked = !currentlyLocked;
+  // Revert checkbox immediately while we wait — prevents visual flicker on error
+  checkbox.disabled = true;
+  const { error } = await sb.from('profiles').update({ is_locked: newLocked }).eq('id', userId);
+  checkbox.disabled = false;
+  if (error) {
+    // Roll back the checkbox visually
+    checkbox.checked = !newLocked;
+    toast('Update failed: ' + error.message, 'error');
+    return;
+  }
+  // Update just this row in-place (no full re-render flicker)
+  const statusEl = $(`#admin-status-${userId}`);
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="status-pill ${newLocked ? 'pending' : 'paid'}">${newLocked ? '🔒 LOCKED' : '✓ ACTIVE'}</span>`;
+  }
+  // Update the toggle's onchange to reflect the new state
+  checkbox.onchange = () => toggleUserLock(userId, newLocked, checkbox);
+  checkbox.title = newLocked ? 'Unlock Account' : 'Lock Account';
+  toast(newLocked ? '🔒 Account locked' : '✅ Account unlocked', newLocked ? 'info' : 'success');
+}
+
+async function deleteAdminUser(userId, displayName) {
+  if (!confirm(`Delete "${displayName}"?\n\nThis will permanently remove their profile and all their receipts from the database. This cannot be undone.`)) return;
+  // Delete their receipts first, then their profile
+  const { error: rErr } = await sb.from('receipts').delete().eq('user_id', userId);
+  if (rErr) { toast('Failed to delete receipts: ' + rErr.message, 'error'); return; }
+  const { error: pErr } = await sb.from('profiles').delete().eq('id', userId);
+  if (pErr) { toast('Failed to delete profile: ' + pErr.message, 'error'); return; }
+  // Remove the row from the DOM immediately
+  $(`#admin-row-${userId}`)?.remove();
+  toast(`🗑 "${displayName}" deleted`, 'info');
+  // Refresh stats
   renderAdminUsers();
 }
 
