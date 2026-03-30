@@ -686,7 +686,7 @@ function updatePreview() {
   const hex = App.brandColor;
   const logoHtml = App.logoBase64 ? `<img src="${App.logoBase64}" class="receipt-logo-img" alt="Logo">` : '';
   const statusClass = status === 'paid' ? 'paid' : 'pending';
-  const docType = status === 'paid' ? 'RECEIPT' : 'INVOICE';
+  const docType = 'INVOICE'; // Always INVOICE in generator; becomes RECEIPT only after dashboard payment
 
   // Line items — use App.lineItems
   const subtotal = getLineItemsSubtotal(App.lineItems);
