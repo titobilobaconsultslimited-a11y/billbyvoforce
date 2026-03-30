@@ -378,6 +378,12 @@ body::before {
 
 .form-input::placeholder { color: var(--text3); }
 
+textarea.form-input {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.6;
+}
+
 select.form-input {
   cursor: pointer;
   appearance: none;
@@ -650,8 +656,27 @@ select.form-input {
   line-height: 1.5;
 }
 
-/* ── Line Items Form ─────────────────────── */
-.line-items-header {
+/* ── Terms & Conditions on receipt ──────── */
+.receipt-terms {
+  padding: 12px 28px 16px;
+  border-top: 1px solid #f0f0f0;
+}
+.receipt-terms-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+.receipt-terms-body {
+  font-size: 11px;
+  color: #666;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* ── Line Items Form ─────────────────────── */.line-items-header {
   display: grid;
   grid-template-columns: 1fr 60px 110px 88px 28px;
   gap: 6px;

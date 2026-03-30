@@ -205,8 +205,13 @@ function buildFromContactHTML(email, phone, address) {
   return lines.length ? `<div class="receipt-contact-details">${lines.join('')}</div>` : '';
 }
 
-function buildAccountDetailsHTML(bankName, accountNumber, accountName) {
-  if (!bankName && !accountNumber && !accountName) return '';
+function buildTermsHTML(terms) {
+  if (!terms) return '';
+  const lines = escapeHTML(terms).replace(/\n/g, '<br>');
+  return `<div class="receipt-terms"><div class="receipt-terms-label">TERMS &amp; CONDITIONS</div><div class="receipt-terms-body">${lines}</div></div>`;
+}
+
+function buildAccountDetailsHTML(bankName, accountNumber, accountName) {  if (!bankName && !accountNumber && !accountName) return '';
   const rows = [];
   if (bankName) rows.push(`<div class="receipt-account-row"><span class="receipt-account-key">Bank</span><span class="receipt-account-val">${escapeHTML(bankName)}</span></div>`);
   if (accountNumber) rows.push(`<div class="receipt-account-row"><span class="receipt-account-key">Account No.</span><span class="receipt-account-val receipt-account-number">${escapeHTML(accountNumber)}</span></div>`);
@@ -694,6 +699,8 @@ function updatePreview() {
   const amountSection = buildAmountSectionHTML(subtotal, currency, vatEnabled, vatRate, hex, 0, discEnabled, discType, discValue);
   const accountDetailsHtml = buildAccountDetailsHTML(bankName, accountNumber, accountName);
   const contactHtml = buildFromContactHTML(email, phone, address);
+  const terms = $('#field-terms')?.value.trim() || '';
+  const termsHtml = buildTermsHTML(terms);
 
   $('#receipt-preview').style.fontFamily = font;
   $('#receipt-preview').innerHTML = `
@@ -716,6 +723,7 @@ function updatePreview() {
       <span class="receipt-status-badge ${statusClass}">${status.toUpperCase()}</span>
     </div>
     ${accountDetailsHtml}
+    ${termsHtml}
     <div class="receipt-brand-footer">
       <img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
       <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
@@ -784,6 +792,7 @@ async function saveReceipt() {
     artist_email: App.currentUser.email || '',
     artist_phone: App.profileData?.phone || '',
     artist_address: App.profileData?.address || '',
+    terms: $('#field-terms')?.value.trim() || '',
   };
 
   const { data, error } = await sb.from('receipts').insert(payload).select().single();
@@ -814,6 +823,8 @@ function newReceipt() {
   $('#field-discount-toggle').checked = false;
   $('#field-discount-value').value = '0';
   $('#discount-rate-group').style.display = 'none';
+  const termsEl = $('#field-terms');
+  if (termsEl) termsEl.value = '';
   // Restore bank details + font from profile
   $('#field-bank-name').value = App.profileData?.bankName || '';
   $('#field-account-number').value = App.profileData?.accountNumber || '';
@@ -896,6 +907,9 @@ function buildPrintWindow(previewInnerHTML, font, hex) {
     .receipt-brand-logo{width:36px;height:36px;object-fit:cover;border-radius:6px}
     .receipt-brand-name{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;color:#111}
     .receipt-brand-slogan{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#aaa}
+    .receipt-terms{padding:12px 28px 16px;border-top:1px solid #f0f0f0}
+    .receipt-terms-label{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#aaa;margin-bottom:6px}
+    .receipt-terms-body{font-size:11px;color:#666;line-height:1.6;white-space:pre-wrap}
     @media print{@page{margin:0.5cm;size:A4}}</style></head>
     <body><div class="receipt-preview">${previewInnerHTML}</div>
     <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),500)}<\/script></body></html>`);
@@ -1014,6 +1028,7 @@ async function previewReceiptFromDashboard(id) {
   const amountSection = buildAmountSectionHTML(subtotal, r.currency, r.vat_enabled, r.vat_rate, hex, r.amount_paid, r.discount_enabled, r.discount_type, r.discount_value);
   const accountDetailsHtml = buildAccountDetailsHTML(r.bank_name, r.account_number, r.account_name);
   const contactHtml = buildFromContactHTML(r.artist_email || '', r.artist_phone || '', r.artist_address || '');
+  const termsHtml = buildTermsHTML(r.terms || '');
 
   const html = `
     <div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex};font-family:${font}">${escapeHTML(r.artist||'')}</div>${contactHtml}</div>
@@ -1028,6 +1043,7 @@ async function previewReceiptFromDashboard(id) {
     <div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div>
     <span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>
     ${accountDetailsHtml}
+    ${termsHtml}
     <div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce">
     <div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div>
     <div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
@@ -1054,7 +1070,8 @@ async function downloadFromDashboard(id) {
   const amountSection = buildAmountSectionHTML(subtotal, r.currency, r.vat_enabled, r.vat_rate, hex, r.amount_paid, r.discount_enabled, r.discount_type, r.discount_value);
   const accountDetailsHtml = buildAccountDetailsHTML(r.bank_name, r.account_number, r.account_name);
   const contactHtml = buildFromContactHTML(r.artist_email || '', r.artist_phone || '', r.artist_address || '');
-  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${escapeHTML(r.artist||'')}</div>${contactHtml}</div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">${docType}</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${escapeHTML(r.artist||'')}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${escapeHTML(r.client||'')}</div></div></div><div class="receipt-divider"></div>${lineItems ? '<div class="receipt-project-label">Services</div>' : ''}${itemsHtml}${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
+  const termsHtml = buildTermsHTML(r.terms || '');
+  const html = `<div class="receipt-preview-header"><div class="receipt-logo-area">${logoHtml}<div class="receipt-business-name" style="color:${hex}">${escapeHTML(r.artist||'')}</div>${contactHtml}</div><div class="receipt-meta"><div class="receipt-title" style="color:${hex}">${docType}</div><div class="receipt-number">#${escapeHTML(r.receipt_num||'')}</div></div></div><div class="receipt-body"><div class="receipt-parties"><div><div class="receipt-party-label">From</div><div class="receipt-party-name">${escapeHTML(r.artist||'')}</div></div><div><div class="receipt-party-label">Billed To</div><div class="receipt-party-name">${escapeHTML(r.client||'')}</div></div></div><div class="receipt-divider"></div>${lineItems ? '<div class="receipt-project-label">Services</div>' : ''}${itemsHtml}${amountSection}</div><div class="receipt-footer"><div><div class="receipt-date-label">Date</div><div class="receipt-date-value">${formatDate(r.date)}</div></div><span class="receipt-status-badge ${statusClass}">${r.status.toUpperCase()}</span></div>${accountDetailsHtml}${termsHtml}<div class="receipt-brand-footer"><img src="Media/logo.png" class="receipt-brand-logo" alt="VOForce"><div class="receipt-brand-name">BILL<span style="color:${hex}">BY</span>VOFORCE</div><div class="receipt-brand-slogan">Africa's First Indigenous Voice Actors Receipt</div></div>`;
   buildPrintWindow(html, font, hex);
 }
 
